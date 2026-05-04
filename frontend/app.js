@@ -76,7 +76,6 @@ async function readJsonResponse(response) {
 function renderResults(data) {
   renderSummary(data);
   renderTruthTable(data.truthTable, data.verification);
-  document.querySelector("#preview").innerHTML = `<div class="svg-wrap">${data.diagramSvg}</div>`;
   document.querySelector("#steps").innerHTML = `<ol>${data.instructions.map((step) => `<li>${escapeHtml(step.replace(/^Step \d+:\s*/, ""))}</li>`).join("")}</ol>`;
   renderDownloads(data);
   renderSimulatorPanel(data);
