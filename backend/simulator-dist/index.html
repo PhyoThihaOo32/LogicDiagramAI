@@ -15,9 +15,114 @@
 
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { width: 100%; height: 100%; overflow: hidden; }
-    #simulation { width: 100%; height: 100%; position: relative; }
-    /* hide the loading spinner overlay once JS runs */
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #fff; }
+
+    /* ── Hide chrome we don't need ──────────────────────────────────────────── */
+    #toolbar-nav,
+    #elementPanel,
+    #moduleProperty,
+    #propertiesPanel,
+    #layoutDialog,
+    .layoutElementPanel,
+    #time-Diagram,
+    #timing_diagram_panel,
+    #UXnightmode,
+    #smallNavbarMenu-btn,
+    #quickmenu-Popover,
+    #quick-btn-id,
+    #exitView,
+    .quick-btn,
+    .clockPropertyHeader { display: none !important; }
+
+    /* ── Canvas fills entire viewport ───────────────────────────────────────── */
+    #simulation {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .canvasArea,
+    #simulationArea,
+    #backgroundArea {
+      width: 100% !important;
+      height: 100% !important;
+    }
+
+    /* Pan cursor hint */
+    #simulationArea { cursor: grab; }
+    #simulationArea:active { cursor: grabbing; }
+
+    /* ── Floating control toolbar (bottom-right) ─────────────────────────────── */
+    #sim-toolbar {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      z-index: 200;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: none; /* let clicks fall through except on buttons */
+    }
+
+    #sim-toolbar button {
+      pointer-events: all;
+      width: 38px;
+      height: 38px;
+      border: 1.5px solid rgba(240, 98, 138, 0.5);
+      border-radius: 9px;
+      background: rgba(10, 10, 10, 0.82);
+      color: #f0628a;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(6px);
+      transition: background 0.15s, border-color 0.15s, transform 0.1s;
+      user-select: none;
+    }
+
+    #sim-toolbar button:hover {
+      background: rgba(240, 98, 138, 0.2);
+      border-color: #f0628a;
+    }
+
+    #sim-toolbar button:active {
+      transform: scale(0.92);
+      background: rgba(240, 98, 138, 0.35);
+    }
+
+    #sim-toolbar .tb-sep {
+      height: 1px;
+      background: rgba(240, 98, 138, 0.25);
+      pointer-events: none;
+      margin: 2px 4px;
+    }
+
+    /* ── Hint strip at bottom-left ───────────────────────────────────────────── */
+    #sim-hint {
+      position: absolute;
+      bottom: 10px;
+      left: 12px;
+      z-index: 200;
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      color: rgba(160, 160, 160, 0.7);
+      pointer-events: none;
+      letter-spacing: 0.02em;
+    }
+
+    /* ── Canvas tab bar ─────────────────────────────────────────────────────── */
+    #tabsBar {
+      position: absolute;
+      left: 0;
+      top: 0;
+      z-index: 4;
+    }
+
+    /* ── Loading spinner (JS compat, hidden by default) ─────────────────────── */
     .loadingIcon { display: none !important; }
   </style>
 </head>
@@ -37,7 +142,7 @@
 <div id="exitView"></div>
 
 <!-- Minimal navbar the JS expects to find -->
-<nav class="navbar navbar-expand-lg navbar-dark header" id="toolbar-nav">
+<nav class="navbar navbar-expand-lg navbar-dark header" id="toolbar-nav" style="display:none!important">
   <div class="navbar-brand">
     <span style="color:#fff;font-weight:bold;padding:0 12px;">CircuitVerse</span>
   </div>
@@ -75,8 +180,8 @@
   </div>
 </nav>
 
-<!-- Quick-action toolbar the JS binds buttons to -->
-<div class="quick-btn" id="quick-btn-id">
+<!-- Quick-action toolbar the JS binds buttons to (hidden, kept for JS compat) -->
+<div class="quick-btn" id="quick-btn-id" style="display:none!important">
   <div id="dragQPanel" class="panel-drag"></div>
   <div><button type="button" id="undoButton" title="Undo"></button></div>
   <div><button type="button" id="redoButton" title="Redo"></button></div>
@@ -87,24 +192,24 @@
   </div>
 </div>
 
-<!-- Element panel (left sidebar) -->
-<div id="elementPanel" class="noSelect">
+<!-- Element panel (left sidebar, hidden) -->
+<div id="elementPanel" class="noSelect" style="display:none!important">
   <div id="menu"></div>
   <input id="elementSearch" type="text" placeholder="Search..." />
 </div>
 <!-- guide_1 required by startListeners touch events (hidden stub) -->
 <div id="guide_1" style="display:none;"></div>
 
-<!-- Properties panel (right sidebar) — needs class moduleProperty for touch listeners -->
-<div id="moduleProperty" class="moduleProperty noSelect" style="display:none;">
+<!-- Properties panel (right sidebar, hidden) -->
+<div id="moduleProperty" class="moduleProperty noSelect" style="display:none!important">
   <div id="moduleProperty-inner"></div>
 </div>
-<div id="propertiesPanel" class="noSelect"></div>
+<div id="propertiesPanel" class="noSelect" style="display:none!important"></div>
 
 <!-- Layout dialog and element panel needed by startListeners -->
-<div id="layoutDialog" class="draggable-panel" style="display:none;"></div>
-<div class="layoutElementPanel" style="display:none;"></div>
-<div id="time-Diagram" class="timing-diagram-panel" style="display:none;"></div>
+<div id="layoutDialog" class="draggable-panel" style="display:none!important"></div>
+<div class="layoutElementPanel" style="display:none!important"></div>
+<div id="time-Diagram" class="timing-diagram-panel" style="display:none!important"></div>
 
 <!-- Canvas area -->
 <div id="simulation" style="position:absolute;top:0;left:0;right:0;bottom:0;">
@@ -124,18 +229,18 @@
             style="position:absolute;left:0;top:0;z-index:1;width:100%;height:100%;"></canvas>
   </div>
   <div id="elementName"></div>
-  <!-- Zoom controls -->
-  <div class="zoom-wrapper" id="zoom-in-out-embed">
-    <button type="button" id="zoom-in-embed" style="font-size:22px;">
-      <span class="fa fa-search-plus" title="Zoom In"></span>
-    </button>
-    <button type="button" id="zoom-out-embed" style="font-size:22px;">
-      <span class="fa fa-search-minus" title="Zoom Out"></span>
-    </button>
+
+  <!-- Original zoom buttons (hidden — kept for JS event binding; we use postMessage instead) -->
+  <div id="zoom-in-out-embed" style="display:none!important">
+    <button type="button" id="zoom-in-embed"><span class="fa fa-search-plus"></span></button>
+    <button type="button" id="zoom-out-embed"><span class="fa fa-search-minus"></span></button>
   </div>
-  <div style="position:absolute;right:10px;top:25px;z-index:100" class="clockPropertyHeader noSelect">
+
+  <!-- Clock controls (hidden) -->
+  <div style="display:none!important" class="clockPropertyHeader noSelect">
     <div id="clockProperty"></div>
   </div>
+
   <!-- Loading spinner (hidden via CSS above, kept for JS compatibility) -->
   <div class="sk-folding-cube loadingIcon"
        style="display:none;position:absolute;right:50%;bottom:50%;z-index:100">
@@ -171,8 +276,57 @@
   </div>
 </div>
 
+<!-- ── Custom floating toolbar ────────────────────────────────────────────── -->
+<div id="sim-toolbar" aria-label="Simulator controls">
+  <button id="sim-fit"    title="Fit to screen (F)">&#x26F6;</button>
+  <div class="tb-sep"></div>
+  <button id="sim-zoomin"  title="Zoom in (+)">+</button>
+  <button id="sim-zoomout" title="Zoom out (−)">−</button>
+</div>
+
+<div id="sim-hint">Scroll to zoom &nbsp;·&nbsp; Drag to pan</div>
+
 <!-- Simulator JS bundle (includes postMessage listener) -->
 <script src="simulator.js"></script>
+
+<script>
+  // Wire up our custom toolbar buttons via postMessage back to self.
+  // The simulator's message handler now responds to simZoomIn/simZoomOut/simFit.
+  function simPost(type) {
+    window.postMessage({ type: type }, '*');
+  }
+
+  document.getElementById('sim-fit').addEventListener('click', function() {
+    simPost('simFit');
+  });
+  document.getElementById('sim-zoomin').addEventListener('click', function() {
+    simPost('simZoomIn');
+  });
+  document.getElementById('sim-zoomout').addEventListener('click', function() {
+    simPost('simZoomOut');
+  });
+
+  // Keyboard shortcuts inside the iframe
+  document.addEventListener('keydown', function(e) {
+    // F → fit to screen
+    if (e.key === 'f' || e.key === 'F') {
+      const active = document.activeElement;
+      if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA')) return;
+      simPost('simFit');
+    }
+    // = / + → zoom in (no modifier needed)
+    if (e.key === '=' || e.key === '+') simPost('simZoomIn');
+    // - → zoom out
+    if (e.key === '-' || e.key === '_') simPost('simZoomOut');
+  });
+
+  // After circuit loads, auto-fit once
+  window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'loadCircuit') {
+      setTimeout(function() { simPost('simFit'); }, 300);
+    }
+  });
+</script>
 
 </body>
 </html>

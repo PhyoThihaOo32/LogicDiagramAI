@@ -244,11 +244,18 @@ input[type="file"] {
 
 .simulator-panel {
   padding: 0;
-  height: min(760px, 80vh);
+  height: min(820px, 82vh);
+}
+
+/* Override .tab-panel.active { display: block } so flex works */
+#simulator.tab-panel.active {
+  display: flex;
+  flex-direction: column;
 }
 
 .simulator-panel:has(.simulator-fallback) {
   height: auto;
+  display: block;
   padding: 20px;
 }
 
@@ -257,12 +264,40 @@ input[type="file"] {
   gap: 14px;
 }
 
+/* ── Simulator control bar (above the iframe) ─────────────────────────────── */
+.sim-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line);
+  background: rgba(15, 15, 15, 0.96);
+  flex-shrink: 0;
+}
+
+.sim-controls button {
+  min-height: 30px;
+  padding: 4px 12px;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  border-radius: 7px;
+}
+
+.sim-controls .sim-hint-label {
+  margin-left: auto;
+  font-size: 0.72rem;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+  pointer-events: none;
+}
+
 .simulator-panel iframe {
+  flex: 1;
   width: 100%;
-  height: 100%;
+  min-height: 0;
   border: 0;
   display: block;
-  background: #0a0a0a;
+  background: #fff;
 }
 
 .grid {

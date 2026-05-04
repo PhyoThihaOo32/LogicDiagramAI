@@ -48903,7 +48903,7 @@ User Id: ${window.user_id}`;
     } else if (simulationArea_default.mouseDown) {
       simulationArea_default.canvas.style.cursor = "grabbing";
     } else {
-      simulationArea_default.canvas.style.cursor = "default";
+      simulationArea_default.canvas.style.cursor = "grab";
     }
   }
   function updateSelectionsAndPane(scope = globalScope) {
@@ -51004,8 +51004,20 @@ User Id: ${window.user_id}`;
   function setup() {
     const startListeners3 = embed ? startListeners2 : startListeners;
     window.addEventListener("message", (event) => {
-      if (event.data && event.data.type === "loadCircuit" && event.data.circuitData) {
+      if (!event.data) return;
+      if (event.data.type === "loadCircuit" && event.data.circuitData) {
         load(event.data.circuitData);
+      } else if (event.data.type === "simZoomIn") {
+        ZoomIn();
+      } else if (event.data.type === "simZoomOut") {
+        ZoomOut();
+      } else if (event.data.type === "simFit") {
+        if (window.globalScope) {
+          window.globalScope.centerFocus(false);
+          gridUpdateSet(true);
+          updateCanvasSet(true);
+          scheduleUpdate(1);
+        }
       }
     });
     setupElementLists();

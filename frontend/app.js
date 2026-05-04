@@ -158,7 +158,23 @@ function renderSimulatorPanel(data) {
     return;
   }
 
-  panel.innerHTML = `<iframe id="cvSimulator" src="about:blank" title="CircuitVerse Simulator" allowfullscreen></iframe>`;
+  panel.innerHTML = `
+    <div class="sim-controls">
+      <button type="button" id="simFitBtn"     title="Fit circuit to screen (F)">&#x26F6; Fit</button>
+      <button type="button" id="simZoomInBtn"  title="Zoom in (+)">+ Zoom In</button>
+      <button type="button" id="simZoomOutBtn" title="Zoom out (−)">− Zoom Out</button>
+      <span class="sim-hint-label">Scroll to zoom &nbsp;·&nbsp; Drag canvas to pan</span>
+    </div>
+    <iframe id="cvSimulator" src="about:blank" title="CircuitVerse Simulator" allowfullscreen></iframe>`;
+
+  // Wire up control bar buttons → postMessage into the iframe
+  const simCmd = (type) => {
+    const fr = document.querySelector("#cvSimulator");
+    if (fr && fr.contentWindow) fr.contentWindow.postMessage({ type }, "*");
+  };
+  document.querySelector("#simFitBtn").addEventListener("click", () => simCmd("simFit"));
+  document.querySelector("#simZoomInBtn").addEventListener("click", () => simCmd("simZoomIn"));
+  document.querySelector("#simZoomOutBtn").addEventListener("click", () => simCmd("simZoomOut"));
 }
 
 function renderSummary(data) {
