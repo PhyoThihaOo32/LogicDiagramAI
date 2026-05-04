@@ -6,6 +6,7 @@ const { buildCircuitModel } = require("../services/circuitModelService");
 const { generateDiagramSvg } = require("../services/circuitDiagramService");
 const { generateInstructions } = require("../services/circuitVerseInstructionService");
 const { createDownloadBundle } = require("../services/downloadBundleService");
+const { parseExpression } = require("../utils/booleanEvaluator");
 
 const router = express.Router();
 const upload = multer({
@@ -49,6 +50,7 @@ router.post("/analyze", handleUpload, async (req, res) => {
     const instructions = generateInstructions(parsed, circuitModel);
     const simulatorCircuit = cvAvailable ? generateSimulatorCircuit(circuitModel) : null;
     const bundle = createDownloadBundle({ circuitModel, diagramSvg, truthTable, instructions, simulatorCircuit, cvAvailable });
+    const verification = verifyParsed(parsed, truthTable);
 
     res.json({
       success: true,
@@ -56,6 +58,7 @@ router.post("/analyze", handleUpload, async (req, res) => {
       imageExtraction,
       parsed,
       truthTable,
+      verification,
       circuitModel,
       diagramSvg,
       instructions,
@@ -97,6 +100,75 @@ function formatCircuitName(parsed) {
 function generateSimulatorCircuit(circuitModel) {
   const { generateExperimentalCvJson } = require("../services/circuitVerseFileService");
   return generateExperimentalCvJson(circuitModel);
+}
+
+// ── Verification ──────────────────────────────────────────────────────────────
+// Checks that the AI's parsed result is internally consistent and uses only
+// declared inputs. Returns an object with verified:true/false + details.
+
+function collectVars(ast) {
+  if (!ast) return [];
+  if (ast.type === "VAR") return [ast.name];
+  if (ast.type === "CONST") return [];
+  if (ast.type === "NOT") return collectVars(ast.value);
+  return [...collectVars(ast.left || null), ...collectVars(ast.right || null)];
+}
+
+function verifyParsed(parsed, truthTable) {
+  const outputs = parsed.outputs || [];
+  const inputs = parsed.inputs || [];
+  const expressions = parsed.expressions || {};
+  const issues = [];
+
+  // 1. Every declared output must have an expression
+  for (const output of outputs) {
+    if (!expressions[output]) {
+      issues.push(`No expression provided for output "${output}"`);
+    }
+  }
+
+  // 2. Every expression must parse cleanly and use only declared inputs
+  for (const [output, expr] of Object.entries(expressions)) {
+    if (!expr) continue;
+    try {
+      const ast = parseExpression(String(expr));
+      const vars = [...new Set(collectVars(ast))];
+      for (const v of vars) {
+        if (!inputs.includes(v)) {
+          issues.push(`Expression for "${output}" uses undeclared variable "${v}" (declared inputs: ${inputs.join(", ") || "none"})`);
+        }
+      }
+    } catch (e) {
+      issues.push(`Expression for "${output}" could not be parsed: ${e.message}`);
+    }
+  }
+
+  // 3. Truth table must have rows (for circuits with ≤8 inputs)
+  if (!truthTable.length && inputs.length > 0 && inputs.length <= 8) {
+    issues.push("Truth table is empty despite having ≤8 inputs");
+  }
+
+  // 4. No null/undefined output cells in truth table
+  let nullCount = 0;
+  for (const row of truthTable) {
+    for (const output of outputs) {
+      if (row[output] === null || row[output] === undefined) nullCount += 1;
+    }
+  }
+  if (nullCount > 0) {
+    issues.push(`${nullCount} truth table cell(s) could not be evaluated`);
+  }
+
+  return {
+    verified: issues.length === 0,
+    rows: truthTable.length,
+    outputCount: outputs.length,
+    inputCount: inputs.length,
+    issues,
+    summary: issues.length === 0
+      ? `All ${truthTable.length} row(s) × ${outputs.length} output(s) successfully evaluated from ${inputs.length} declared input(s).`
+      : issues.join(" · ")
+  };
 }
 
 module.exports = router;

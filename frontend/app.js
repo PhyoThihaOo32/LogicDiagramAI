@@ -75,7 +75,7 @@ async function readJsonResponse(response) {
 
 function renderResults(data) {
   renderSummary(data);
-  renderTruthTable(data.truthTable);
+  renderTruthTable(data.truthTable, data.verification);
   document.querySelector("#preview").innerHTML = `<div class="svg-wrap">${data.diagramSvg}</div>`;
   document.querySelector("#steps").innerHTML = `<ol>${data.instructions.map((step) => `<li>${escapeHtml(step.replace(/^Step \d+:\s*/, ""))}</li>`).join("")}</ol>`;
   renderDownloads(data);
@@ -168,7 +168,9 @@ function renderSummary(data) {
   const visibleOutputs = (data.circuitModel?.gates || [])
     .filter((gate) => gate.type === "OUTPUT")
     .map((gate) => gate.label);
+  const miniChip = buildMiniVerifyChip(data.verification);
   document.querySelector("#summary").innerHTML = `
+    ${miniChip}
     <div class="grid">
       <div class="card"><h3>Type</h3><p>${escapeHtml(parsed.type)}${parsed.subtype ? ` / ${escapeHtml(parsed.subtype)}` : ""}</p></div>
       <div class="card"><h3>External Inputs</h3><p>${escapeHtml(externalInputs.join(", ") || "none")}</p></div>
@@ -185,13 +187,23 @@ function renderSummary(data) {
   `;
 }
 
-function renderTruthTable(rows) {
+function buildMiniVerifyChip(verification) {
+  if (!verification) return "";
+  if (verification.verified) {
+    return `<div class="verify-chip verified">✓ Logic verified &mdash; expressions evaluated cleanly across all ${escapeHtml(String(verification.rows))} truth table rows. Review the expressions below to confirm the AI interpreted your question correctly.</div>`;
+  }
+  return `<div class="verify-chip failed">⚠ Verification found issues &mdash; check the Truth Table tab for details. The diagram may not match your intended logic.</div>`;
+}
+
+function renderTruthTable(rows, verification) {
+  const badge = buildVerifyBadge(verification);
   if (!rows.length) {
-    document.querySelector("#truth").innerHTML = "<p>No rows generated.</p>";
+    document.querySelector("#truth").innerHTML = `${badge}<p>No rows generated.</p>`;
     return;
   }
   const headers = Object.keys(rows[0]);
   document.querySelector("#truth").innerHTML = `
+    ${badge}
     <table>
       <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
       <tbody>
@@ -199,6 +211,15 @@ function renderTruthTable(rows) {
       </tbody>
     </table>
   `;
+}
+
+function buildVerifyBadge(verification) {
+  if (!verification) return "";
+  if (verification.verified) {
+    return `<div class="verify-badge verified">✓ VERIFIED &mdash; ${escapeHtml(verification.summary)}</div>`;
+  }
+  const issueList = (verification.issues || []).map((i) => `<li>${escapeHtml(i)}</li>`).join("");
+  return `<div class="verify-badge failed">⚠ ISSUES DETECTED &mdash; ${escapeHtml(verification.summary)}${issueList ? `<ul>${issueList}</ul>` : ""}</div>`;
 }
 
 function renderDownloads(data) {
