@@ -202,6 +202,16 @@ input[type="file"] {
   height: min(760px, 80vh);
 }
 
+.simulator-panel:has(.simulator-fallback) {
+  height: auto;
+  padding: 20px;
+}
+
+.simulator-fallback {
+  display: grid;
+  gap: 14px;
+}
+
 .simulator-panel iframe {
   width: 100%;
   height: 100%;
@@ -319,6 +329,10 @@ li {
   }
 
   .tab-panel {
+    padding: 14px;
+  }
+
+  .simulator-panel:has(.simulator-fallback) {
     padding: 14px;
   }
 }

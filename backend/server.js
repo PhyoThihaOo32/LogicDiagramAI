@@ -2,12 +2,15 @@ const path = require("path");
 const express = require("express");
 require("dotenv").config();
 
+if (process.env.DEBUG_STARTUP === "1") console.time("startup:routes");
 const analyzeRoutes = require("./routes/analyzeRoutes");
 const exportRoutes = require("./routes/exportRoutes");
 const downloadRoutes = require("./routes/downloadRoutes");
+if (process.env.DEBUG_STARTUP === "1") console.timeEnd("startup:routes");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || "127.0.0.1";
 
 app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -55,6 +58,14 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/index.html"));
 });
 
-app.listen(PORT, () => {
-  console.log(`AI Logic Diagram Generator running at http://localhost:${PORT}`);
+const server = app.listen(PORT, HOST, () => {
+  console.log(`AI Logic Diagram Generator running at http://${HOST}:${PORT}`);
+});
+
+server.on("error", (error) => {
+  if (error.code === "EADDRINUSE") {
+    console.error(`Port ${PORT} is already in use on ${HOST}. Stop the existing server or set PORT to another value.`);
+    process.exit(1);
+  }
+  throw error;
 });

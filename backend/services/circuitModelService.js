@@ -1,13 +1,19 @@
 const { parseExpression, astToText } = require("../utils/booleanEvaluator");
 
 function buildCircuitModel(parsed) {
+  const hasFlipFlops = Boolean(parsed.flipFlops && parsed.flipFlops.length);
+  const stateVariables = parsed.stateVariables || [];
+  const externalInputs = hasFlipFlops
+    ? (parsed.inputs || []).filter((input) => !stateVariables.includes(input))
+    : [...(parsed.inputs || [])];
+  const layoutSignals = [...externalInputs, ...stateVariables];
   const model = {
     projectName: "AI Generated Circuit",
     type: parsed.type,
     subtype: parsed.subtype || "general",
-    inputs: parsed.inputs,
-    outputs: parsed.outputs,
-    expressions: parsed.expressions,
+    inputs: externalInputs,
+    outputs: [...(parsed.outputs || [])],
+    expressions: { ...(parsed.expressions || {}) },
     gates: [],
     wires: [],
     metadata: {
@@ -18,41 +24,90 @@ function buildCircuitModel(parsed) {
   };
 
   const counters = { NOT: 0, AND: 0, OR: 0, XOR: 0 };
-  const notCache = new Map();
-  const inputY = new Map(parsed.inputs.map((input, index) => [input, 95 + index * 72]));
+  // Shared gate cache keyed by canonical AST text; avoids duplicate gates for
+  // repeated subexpressions (e.g. A'B' appearing in multiple minterms).
+  const gateCache = new Map();
+  const inputY = new Map(layoutSignals.map((input, index) => [input, 95 + index * 72]));
   const outputLayouts = [];
+  // Maps each output name to { signal, sourceId } so flip-flops can reference the
+  // correct logic signal instead of the (non-existent) output name string.
+  const outputSignals = new Map();
 
   parsed.outputs.forEach((output, outputIndex) => {
     const ast = parseExpression(parsed.expressions[output]);
     const layout = layoutAst(ast, outputIndex, inputY, parsed.outputs.length);
     outputLayouts.push(layout);
-    const built = buildAstGates(ast, model, { counters, notCache, inputY }, layout);
-    const outputGate = {
-      id: `output_${output}`,
-      type: "OUTPUT",
-      label: output,
-      x: 210 + (layout.maxDepth + 1) * 118,
-      y: layout.rootY - 15,
-      inputs: [built.signal],
-      output
-    };
-    model.gates.push(outputGate);
-    model.wires.push({ from: built.sourceId, to: outputGate.id, signal: built.signal });
+    const built = buildAstGates(ast, model, { counters, gateCache, inputY }, layout);
+    outputSignals.set(output, built);
+    // In sequential circuits, D outputs are next-state inputs to flip-flops.
+    // They should feed the DFF blocks directly instead of appearing as external
+    // output pins, while non-state outputs such as Z/Green/Red remain visible.
+    if (!isFlipFlopInputOutput(parsed, output)) {
+      const outputGate = {
+        id: `output_${output}`,
+        type: "OUTPUT",
+        label: output,
+        x: 210 + (layout.maxDepth + 1) * 118,
+        y: layout.rootY - 15,
+        inputs: [built.signal],
+        output
+      };
+      model.gates.push(outputGate);
+      model.wires.push({ from: built.sourceId, to: outputGate.id, signal: built.signal });
+    }
   });
 
-  if (parsed.flipFlops && parsed.flipFlops.length) {
+  if (hasFlipFlops) {
+    // Compute the right edge of the circuit so flip-flops are placed after it.
+    const maxOutputX = Math.max(
+      0,
+      ...model.gates.filter((g) => g.type === "OUTPUT").map((g) => g.x)
+    );
+    const dffX = maxOutputX + 100;
+
+    // For sequential circuits add a CLK input if not already present in the model.
+    if (!model.inputs.includes("CLK")) {
+      const clkY = 95 + model.inputs.length * 72;
+      model.inputs.push("CLK");
+      inputY.set("CLK", clkY);
+    }
+
     parsed.flipFlops.forEach((name, index) => {
+      // Wire D input to the actual logic output signal that computes this flip-flop's
+      // next-state value, not to the literal string "name" which has no wire.
+      const logic = outputSignals.get(name);
+      const dInputSignal = logic ? logic.signal : name;
+      const dInputSourceId = logic ? logic.sourceId : name;
+
+      const sourceGate = dInputSourceId ? model.gates.find((gate) => gate.id === dInputSourceId) : null;
+      const sourceHeight = sourceGate ? (GATE_HEIGHTS[sourceGate.type] || 50) : 50;
+      const dffY = sourceGate
+        ? sourceGate.y + sourceHeight / 2
+        : 95 + (parsed.inputs.length + index) * 72;
+      const qOutput = `Q${name.replace(/^D/i, "")}`;
       model.gates.push({
         id: `dff_${name}`,
         type: "D_FLIP_FLOP",
-        label: `${name} -> Q${name.replace(/^D/i, "")}`,
-        x: 620,
-        y: 285 + index * 80,
-        inputs: [name, "CLK"],
-        output: `Q${name.replace(/^D/i, "")}`
+        label: `${name} -> ${qOutput}`,
+        x: dffX,
+        y: dffY - (GATE_HEIGHTS.D_FLIP_FLOP / 2),
+        inputs: [dInputSignal, "CLK"],
+        output: qOutput
       });
+      // Wire from logic output to DFF D input
+      model.wires.push({ from: dInputSourceId, to: `dff_${name}`, signal: dInputSignal });
+      // Wire CLK input to DFF
+      model.wires.push({ from: "CLK", to: `dff_${name}`, signal: "CLK" });
     });
+
+    rerouteStateVariableWiresToFlipFlops(model, stateVariables, parsed.flipFlops);
   }
+
+  // Global deconfliction: gates from different output expressions can land at the
+  // same (x, y) column. Push overlapping gates apart so the diagram is readable.
+  deconflictGlobalPositions(model.gates);
+  alignOutputPinsToFinalSources(model);
+  alignFlipFlopsToFinalSources(model);
 
   model.layout = {
     inputs: Object.fromEntries(inputY),
@@ -63,8 +118,143 @@ function buildCircuitModel(parsed) {
   return model;
 }
 
+function rerouteStateVariableWiresToFlipFlops(model, stateVariables, flipFlops) {
+  const stateSourceByName = new Map();
+  flipFlops.forEach((dName) => {
+    const qName = `Q${String(dName).replace(/^D/i, "")}`;
+    stateSourceByName.set(qName, `dff_${dName}`);
+  });
+
+  const stateSet = new Set(stateVariables);
+  model.wires.forEach((wire) => {
+    if (!stateSet.has(wire.from)) return;
+    const sourceId = stateSourceByName.get(wire.from);
+    if (sourceId) wire.from = sourceId;
+  });
+}
+
+function isFlipFlopInputOutput(parsed, output) {
+  return Boolean(
+    parsed.flipFlops &&
+      parsed.flipFlops.some((name) => String(name).toUpperCase() === String(output).toUpperCase())
+  );
+}
+
+// Gate height by type (matches normalizeNode sizes in circuitDiagramService).
+const GATE_HEIGHTS = { NOT: 42, AND: 50, OR: 52, XOR: 52, OUTPUT: 32, D_FLIP_FLOP: 62 };
+const GATE_WIDTHS = { NOT: 58, AND: 76, OR: 82, XOR: 88, OUTPUT: 76, D_FLIP_FLOP: 104 };
+
+function deconflictGlobalPositions(gates) {
+  const GAP = 14; // minimum vertical gap between adjacent gates in same column
+  // Group gates by their x position (exact match, since x values are multiples of 118).
+  const columns = new Map();
+  gates.forEach((gate) => {
+    if (!columns.has(gate.x)) columns.set(gate.x, []);
+    columns.get(gate.x).push(gate);
+  });
+
+  columns.forEach((colGates) => {
+    if (colGates.length < 2) return;
+    colGates.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < colGates.length; i++) {
+      const prev = colGates[i - 1];
+      const prevBottom = prev.y + (GATE_HEIGHTS[prev.type] || 50);
+      const needed = prevBottom + GAP;
+      if (colGates[i].y < needed) {
+        colGates[i].y = needed;
+      }
+    }
+  });
+}
+
+function alignOutputPinsToFinalSources(model) {
+  const gatesById = new Map(model.gates.map((gate) => [gate.id, gate]));
+  const outputEntries = model.gates
+    .filter((gate) => gate.type === "OUTPUT")
+    .map((outputGate) => ({
+      outputGate,
+      wire: model.wires.find((candidate) => candidate.to === outputGate.id)
+    }))
+    .filter((entry) => entry.wire && gatesById.has(entry.wire.from));
+
+  const entriesBySource = new Map();
+  outputEntries.forEach((entry) => {
+    if (!entriesBySource.has(entry.wire.from)) entriesBySource.set(entry.wire.from, []);
+    entriesBySource.get(entry.wire.from).push(entry);
+  });
+
+  entriesBySource.forEach((entries, sourceId) => {
+    const sourceGate = gatesById.get(sourceId);
+    const sourceHeight = GATE_HEIGHTS[sourceGate.type] || 50;
+    const sourceWidth = GATE_WIDTHS[sourceGate.type] || 104;
+    const outputHeight = GATE_HEIGHTS.OUTPUT;
+    const sourceCenterY = sourceGate.y + sourceHeight / 2;
+    const gap = 44;
+    const hasStateOutputs = entries.some((entry) => /^D\d+$/i.test(entry.outputGate.label || ""));
+
+    entries
+      .sort((a, b) => outputPriority(a.outputGate) - outputPriority(b.outputGate))
+      .forEach((entry, index) => {
+        const { outputGate } = entry;
+        const offset = (index - (entries.length - 1) / 2) * gap;
+        const y = entries.length === 1 ? sourceCenterY : sourceCenterY + offset;
+        const extraX = hasStateOutputs && /^D\d+$/i.test(outputGate.label || "") ? 150 : 64;
+        outputGate.y = y - outputHeight / 2;
+        outputGate.x = Math.max(outputGate.x, sourceGate.x + sourceWidth + extraX);
+      });
+  });
+
+  model.gates
+    .filter((gate) => gate.type === "OUTPUT")
+    .forEach((outputGate) => {
+      const wire = model.wires.find((candidate) => candidate.to === outputGate.id);
+      const sourceGate = wire ? gatesById.get(wire.from) : null;
+      if (!sourceGate) return;
+
+      const sourceWidth = GATE_WIDTHS[sourceGate.type] || 104;
+      outputGate.x = Math.max(outputGate.x, sourceGate.x + sourceWidth + 64);
+    });
+}
+
+function outputPriority(gate) {
+  const label = String(gate.label || "");
+  if (/^D\d+$/i.test(label)) return 2;
+  return 1;
+}
+
+function alignFlipFlopsToFinalSources(model) {
+  const gatesById = new Map(model.gates.map((gate) => [gate.id, gate]));
+  const maxOutputRight = Math.max(
+    0,
+    ...model.gates
+      .filter((gate) => gate.type === "OUTPUT")
+      .map((gate) => gate.x + (GATE_WIDTHS.OUTPUT || 76))
+  );
+  const maxLogicRight = Math.max(
+    0,
+    ...model.gates
+      .filter((gate) => gate.type !== "OUTPUT" && gate.type !== "D_FLIP_FLOP")
+      .map((gate) => gate.x + (GATE_WIDTHS[gate.type] || 104))
+  );
+  const flipFlopX = Math.max(maxOutputRight, maxLogicRight) + 40;
+
+  model.gates
+    .filter((gate) => gate.type === "D_FLIP_FLOP")
+    .forEach((flipFlop) => {
+      const dSignal = flipFlop.inputs && flipFlop.inputs[0];
+      const dWire = model.wires.find((wire) => wire.to === flipFlop.id && wire.signal === dSignal);
+      const sourceGate = dWire ? gatesById.get(dWire.from) : null;
+      if (sourceGate) {
+        const sourceHeight = GATE_HEIGHTS[sourceGate.type] || 50;
+        flipFlop.y = sourceGate.y + sourceHeight / 2 - GATE_HEIGHTS.D_FLIP_FLOP / 2;
+      }
+      flipFlop.x = Math.max(flipFlop.x, flipFlopX);
+    });
+}
+
 function buildAstGates(ast, model, context, layout) {
-  const { counters, notCache } = context;
+  const { counters, gateCache, inputY } = context;
+
   if (ast.type === "VAR") {
     return { signal: ast.name, sourceId: ast.name };
   }
@@ -72,30 +262,33 @@ function buildAstGates(ast, model, context, layout) {
     return { signal: String(ast.value), sourceId: String(ast.value) };
   }
 
+  // Check shared gate cache before building a new gate.
+  const cacheKey = astToText(ast);
+  if (gateCache.has(cacheKey)) {
+    return gateCache.get(cacheKey);
+  }
+
   if (ast.type === "NOT") {
     const input = buildAstGates(ast.value, model, context, layout);
-    const cacheKey = ast.value.type === "VAR" ? ast.value.name : null;
-    if (cacheKey && notCache.has(cacheKey)) {
-      return notCache.get(cacheKey);
-    }
     const id = `not_${++counters.NOT}`;
     const signal = `${input.signal}_not_${counters.NOT}`;
     const point = layout.positions.get(ast);
-    const alignedY = ast.value.type === "VAR" && context.inputY.has(ast.value.name)
-      ? context.inputY.get(ast.value.name)
-      : point.y;
+    const alignedY =
+      ast.value.type === "VAR" && inputY.has(ast.value.name)
+        ? inputY.get(ast.value.name)
+        : (point ? point.y : 95);
     model.gates.push({
       id,
       type: "NOT",
       label: astToText(ast),
-      x: point.x,
+      x: point ? point.x : 150,
       y: alignedY - 21,
       inputs: [input.signal],
       output: signal
     });
     model.wires.push({ from: input.sourceId, to: id, signal: input.signal });
     const result = { signal, sourceId: id };
-    if (cacheKey) notCache.set(cacheKey, result);
+    gateCache.set(cacheKey, result);
     return result;
   }
 
@@ -108,21 +301,28 @@ function buildAstGates(ast, model, context, layout) {
     id,
     type: ast.type,
     label: astToText(ast),
-    x: point.x,
-    y: point.y - 25,
+    x: point ? point.x : 150,
+    y: point ? point.y - 25 : 95,
     inputs: [left.signal, right.signal],
     output: signal
   });
   model.wires.push({ from: left.sourceId, to: id, signal: left.signal });
   model.wires.push({ from: right.sourceId, to: id, signal: right.signal });
-  return { signal, sourceId: id };
+  const result = { signal, sourceId: id };
+  gateCache.set(cacheKey, result);
+  return result;
 }
 
 function layoutAst(ast, outputIndex, inputY, outputCount) {
   const positions = new Map();
   const depthByNode = new Map();
   const laneSpacing = 64;
-  const outputBand = Math.max(210, inputY.size * 72 + 64);
+  // Multiple-output circuits such as decoders need one compact lane per output.
+  // A full input-height band per output makes simple decoders far too tall.
+  const outputBand =
+    outputCount > 1
+      ? Math.max(84, Math.min(126, inputY.size * 36 + 16))
+      : Math.max(210, inputY.size * 72 + 64);
   const bandStart = 82 + outputIndex * outputBand;
   let syntheticLeafLane = 0;
 

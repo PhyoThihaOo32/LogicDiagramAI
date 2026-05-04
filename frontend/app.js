@@ -7,9 +7,11 @@ const state = {
 };
 // When served from the Express backend (port 3000) use relative URLs.
 // When opened via file:// or a dev server (e.g. Live Server on 5500), point at the backend directly.
+// Use 127.0.0.1 because the backend intentionally binds there; localhost can
+// resolve to ::1 on some machines and fail even while the server is running.
 const API_BASE =
   window.location.protocol === "file:" || window.location.port !== "3000"
-    ? "http://localhost:3000"
+    ? "http://127.0.0.1:3000"
     : "";
 
 const question = document.querySelector("#question");
@@ -40,6 +42,10 @@ analyzeBtn.addEventListener("click", analyze);
 imageInput.addEventListener("change", () => {
   imageName.textContent = imageInput.files[0] ? imageInput.files[0].name : "No image selected";
 });
+
+if (window.location.protocol === "file:") {
+  setStatus("Running from a local file. The app will use the backend at http://127.0.0.1:3000; for the most reliable experience, open that URL directly.");
+}
 
 async function analyze(event) {
   if (event) event.preventDefault();
@@ -87,12 +93,14 @@ function renderResults(data) {
   document.querySelector("#preview").innerHTML = `<div class="svg-wrap">${data.diagramSvg}</div>`;
   document.querySelector("#steps").innerHTML = `<ol>${data.instructions.map((step) => `<li>${escapeHtml(step.replace(/^Step \d+:\s*/, ""))}</li>`).join("")}</ol>`;
   renderDownloads(data);
+  renderSimulatorPanel(data);
   // If the simulator frame is already loaded (user visited the tab earlier), update it immediately.
-  if (state.simulatorFrameLoaded) loadSimulator(data);
+  if (data.parsed?.type !== "sequential" && state.simulatorFrameLoaded) loadSimulator(data);
   activateTab("summary");
 }
 
 function loadSimulator(data) {
+  if (data?.parsed?.type === "sequential") return;
   if (!data || !data.simulatorCircuit) return;
   const iframe = document.querySelector("#cvSimulator");
   if (!iframe) return;
@@ -134,25 +142,60 @@ function loadSimulator(data) {
   }
 }
 
+function renderSimulatorPanel(data) {
+  const panel = document.querySelector("#simulator");
+  if (!panel) return;
+
+  if (data.parsed?.type === "sequential") {
+    state.simulatorRetryTimers.forEach((timer) => window.clearTimeout(timer));
+    state.simulatorRetryTimers = [];
+    state.simulatorFrameLoaded = false;
+    panel.innerHTML = `
+      <div class="simulator-fallback">
+      <div class="notice">
+        <strong>Sequential simulator note.</strong>
+        The generated logic is a state-machine diagram. CircuitVerse simulation needs explicit D flip-flop feedback and an initial reset state, so the embedded experimental importer is disabled for this case to avoid showing invalid red/X wiring.
+      </div>
+      <div class="grid">
+        <div class="card">
+          <h3>Expected State Sequence</h3>
+          <p>${escapeHtml(data.parsed.stateDiagram || "Use the D equations and truth table to step the state bits on each clock.")}</p>
+        </div>
+        <div class="card">
+          <h3>Initial State</h3>
+          <p>For a simple traffic light, reset/start with Q1Q0 = 00. That makes Green = 1, Yellow = 0, and Red = 0.</p>
+        </div>
+      </div>
+      <div class="svg-wrap">${data.diagramSvg}</div>
+      </div>
+    `;
+    return;
+  }
+
+  panel.innerHTML = `<iframe id="cvSimulator" src="about:blank" title="CircuitVerse Simulator" allowfullscreen></iframe>`;
+}
+
 function renderSummary(data) {
   const parsed = data.parsed;
+  const stateVariables = parsed.stateVariables || [];
+  const externalInputs = data.circuitModel?.inputs || parsed.inputs || [];
+  const visibleOutputs = (data.circuitModel?.gates || [])
+    .filter((gate) => gate.type === "OUTPUT")
+    .map((gate) => gate.label);
   document.querySelector("#summary").innerHTML = `
     <div class="grid">
       <div class="card"><h3>Type</h3><p>${escapeHtml(parsed.type)}${parsed.subtype ? ` / ${escapeHtml(parsed.subtype)}` : ""}</p></div>
-      <div class="card"><h3>Inputs</h3><p>${escapeHtml(parsed.inputs.join(", "))}</p></div>
-      <div class="card"><h3>Outputs</h3><p>${escapeHtml(parsed.outputs.join(", "))}</p></div>
+      <div class="card"><h3>External Inputs</h3><p>${escapeHtml(externalInputs.join(", ") || "none")}</p></div>
+      <div class="card"><h3>${parsed.type === "sequential" ? "State / Equations" : "Outputs"}</h3><p>${escapeHtml(parsed.outputs.join(", "))}</p></div>
+      ${stateVariables.length ? `<div class="card"><h3>State Variables</h3><p>${escapeHtml(stateVariables.join(", "))}</p></div>` : ""}
+      ${visibleOutputs.length && parsed.type === "sequential" ? `<div class="card"><h3>Visible Outputs</h3><p>${escapeHtml(visibleOutputs.join(", "))}</p></div>` : ""}
     </div>
     <h3>Expressions</h3>
     <pre>${escapeHtml(JSON.stringify(parsed.expressions, null, 2))}</pre>
     ${data.imageExtraction ? `<h3>Image Extraction</h3><pre>${escapeHtml(JSON.stringify(data.imageExtraction, null, 2))}</pre>` : ""}
     <h3>Circuit Diagram</h3>
     <div class="svg-wrap">${data.diagramSvg}</div>
-    <h3>Explanation</h3>
-    <p>${escapeHtml(parsed.explanation || "Generated with the local parser.")}</p>
     ${parsed.stateDiagram ? `<h3>State Diagram</h3><pre>${escapeHtml(parsed.stateDiagram)}</pre>` : ""}
-    ${parsed.notes ? `<h3>Notes</h3><p>${escapeHtml(parsed.notes)}</p>` : ""}
-    <h3>Internal Circuit Model</h3>
-    <pre>${escapeHtml(JSON.stringify(data.circuitModel, null, 2))}</pre>
   `;
 }
 
@@ -175,11 +218,13 @@ function renderTruthTable(rows) {
 function renderDownloads(data) {
   clearDownloadUrls();
   const links = buildDownloadLinks(data);
+  const isSequential = data.parsed?.type === "sequential";
 
   const downloadsTab = document.querySelector("#downloads");
   downloadsTab.innerHTML = `
     <div class="notice">
       <strong>Stable exports.</strong> Download the generated diagram, truth table, build steps, or internal circuit model.
+      ${isSequential ? " Sequential CircuitVerse .cv export is hidden because D flip-flop feedback import is not reliable yet." : " CircuitVerse .cv export is experimental and should be verified in CircuitVerse."}
     </div>
     <div class="downloads">
       ${links.map((link) => `<a class="download-button" href="${link.url}" download="${link.filename}" target="_blank" data-artifact="${link.type}">${link.label}</a>`).join("")}
@@ -208,13 +253,14 @@ function renderDownloads(data) {
 
 function buildDownloadLinks(data) {
   const serverArtifacts = data.artifacts || {};
+  const isSequential = data.parsed?.type === "sequential";
   const items = [
-    artifactDefinition("cv", "Download CircuitVerse .cv File", "ai-generated-circuit.cv", "application/octet-stream", data.simulatorCircuit ? JSON.stringify(data.simulatorCircuit, null, 2) : JSON.stringify(data.circuitModel, null, 2), serverArtifacts.cv),
+    !isSequential && artifactDefinition("cv", "Download Experimental .cv File", "ai-generated-circuit.cv", "application/octet-stream", data.simulatorCircuit ? JSON.stringify(data.simulatorCircuit, null, 2) : JSON.stringify(data.circuitModel, null, 2), serverArtifacts.cv),
     artifactDefinition("svg", "Download SVG", "ai-generated-circuit.svg", "image/svg+xml", data.diagramSvg, serverArtifacts.svg),
     artifactDefinition("csv", "Download CSV", "truth-table.csv", "text/csv", toCsv(data.truthTable), serverArtifacts.csv),
     artifactDefinition("txt", "Download TXT", "logic-build-steps.txt", "text/plain", data.instructions.join("\n"), serverArtifacts.txt),
     artifactDefinition("json", "Download JSON", "internal-circuit-model.json", "application/json", JSON.stringify(data.circuitModel, null, 2), serverArtifacts.json)
-  ];
+  ].filter(Boolean);
   return items.map((item) => {
     if (item.server?.downloadUrl) {
       return {

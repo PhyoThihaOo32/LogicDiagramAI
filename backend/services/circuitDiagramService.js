@@ -25,12 +25,33 @@ function generateDiagramSvg(circuitModel) {
     nodeMap.set(gate.id, normalizeNode(gate));
   });
 
+  // Also add CLK node if sequential and CLK was added to inputY but not in inputs array
+  if (circuitModel.type === "sequential" && inputY.has("CLK") && !inputs.includes("CLK")) {
+    const clkY = Number(inputY.get("CLK"));
+    const clkNode = { id: "CLK", type: "INPUT", label: "CLK", x: 34, y: clkY - 16, width: 70, height: 32 };
+    nodeMap.set("CLK", clkNode);
+    inputNodes.push(clkNode);
+  }
+
   const bounds = calculateBounds([...inputNodes, ...gates.map(normalizeNode)]);
   const width = Math.max(640, bounds.maxX + 56);
   const height = Math.max(340, bounds.maxY + 64);
 
-  const wires = (circuitModel.wires || []).map((wire) => drawWire(wire, nodeMap)).join("\n");
-  const nodes = [...inputNodes, ...gates.map(normalizeNode)].map(drawNode).join("\n");
+  // Build a map from signal name to source node output anchor Y, so inputAnchor can
+  // snap gate inputs to the wire's actual incoming Y and avoid upward-going wires.
+  const signalSourceY = new Map();
+  (circuitModel.wires || []).forEach((wire) => {
+    const src = nodeMap.get(wire.from);
+    if (src) {
+      const anchor = outputAnchor(src);
+      signalSourceY.set(wire.signal, anchor.y);
+    }
+  });
+
+  const wires = (circuitModel.wires || [])
+    .map((wire) => drawWire(wire, nodeMap, signalSourceY))
+    .join("\n");
+  const nodes = [...inputNodes, ...gates.map(normalizeNode)].map((n) => drawNode(n, signalSourceY)).join("\n");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Generated circuit diagram">
 <defs>
@@ -70,14 +91,14 @@ function calculateBounds(nodes) {
   );
 }
 
-function drawWire(wire, nodeMap) {
+function drawWire(wire, nodeMap, signalSourceY) {
   const from = nodeMap.get(wire.from);
   const to = nodeMap.get(wire.to);
   if (!from || !to) return "";
 
   const start = outputAnchor(from);
-  const end = inputAnchor(to, wire.signal);
-  const path = wirePath(start, end, to.type);
+  const end = inputAnchor(to, wire.signal, signalSourceY);
+  const path = wirePath(start, end);
   const label = wire.signal && !wire.signal.includes("_out") && !wire.signal.includes("_not_")
     ? `<text x="${start.x + 5}" y="${start.y - 5}" font-family="Arial" font-size="9" fill="#a7f3d0">${escapeXml(wire.signal)}</text>`
     : "";
@@ -86,31 +107,58 @@ function drawWire(wire, nodeMap) {
 ${label}`;
 }
 
-function wirePath(start, end, targetType) {
+function wirePath(start, end) {
+  // Straight line when Y difference is negligible
   if (Math.abs(start.y - end.y) <= 4) {
-    return `M ${start.x} ${end.y} L ${end.x} ${end.y}`;
+    return `M ${start.x} ${start.y} L ${end.x} ${end.y}`;
   }
 
-  const gap = end.x - start.x;
-  const elbowPadding = targetType === "OUTPUT" ? 18 : 14;
-  const elbowX = Math.max(start.x + 18, end.x - elbowPadding);
+  // Feedback path, used for sequential circuits where a DFF Q output drives
+  // next-state logic to its left. Route around the right side with 90-degree
+  // elbows instead of drawing diagonal or crossing-through wires.
+  if (start.x >= end.x) {
+    const elbowX = start.x + 24;
+    return `M ${start.x} ${start.y} L ${elbowX} ${start.y} L ${elbowX} ${end.y} L ${end.x} ${end.y}`;
+  }
+
+  // Elbow routing: go right from start, bend vertically, arrive at end.
+  // Place the elbow column close to the target so the horizontal segment into
+  // the gate is short and the long run stays on the source side.
+  const elbowX = Math.max(start.x + 14, end.x - 20);
   return `M ${start.x} ${start.y} L ${elbowX} ${start.y} L ${elbowX} ${end.y} L ${end.x} ${end.y}`;
 }
 
 function outputAnchor(node) {
+  // All node types: output exits from the right-centre edge.
   if (node.type === "NOT") return { x: node.x + node.width + 8, y: node.y + node.height / 2 };
-  if (node.type === "AND" || node.type === "OR" || node.type === "XOR") return { x: node.x + node.width, y: node.y + node.height / 2 };
   return { x: node.x + node.width, y: node.y + node.height / 2 };
 }
 
-function inputAnchor(node, signal) {
-  if (!node.inputs || node.inputs.length <= 1) return { x: node.x, y: node.y + node.height / 2 };
-  const index = Math.max(0, node.inputs.indexOf(signal));
-  const gap = node.height / (node.inputs.length + 1);
+function inputAnchor(node, signal, signalSourceY) {
+  const inputs = node.inputs || [];
+  if (inputs.length <= 1) {
+    // Single-input node: centre of left edge
+    return { x: node.x, y: node.y + node.height / 2 };
+  }
+
+  const index = Math.max(0, inputs.indexOf(signal));
+
+  // Prefer snapping to the actual source wire Y so the input tick aligns with
+  // the incoming wire and prevents visually upward wires on tightly-spaced gates.
+  if (signalSourceY && signalSourceY.has(signal)) {
+    const srcY = signalSourceY.get(signal);
+    // Clamp to the gate's vertical extent with a small margin so the tick stays on-gate
+    const margin = 6;
+    const clampedY = Math.max(node.y + margin, Math.min(node.y + node.height - margin, srcY));
+    return { x: node.x, y: clampedY };
+  }
+
+  // Fallback: evenly distribute inputs within gate height
+  const gap = node.height / (inputs.length + 1);
   return { x: node.x, y: node.y + gap * (index + 1) };
 }
 
-function drawNode(node) {
+function drawNode(node, signalSourceY) {
   switch (node.type) {
     case "INPUT":
       return drawPin(node, "#cffafe", "#0891b2");
@@ -119,11 +167,11 @@ function drawNode(node) {
     case "NOT":
       return drawNotGate(node);
     case "AND":
-      return drawAndGate(node);
+      return drawAndGate(node, signalSourceY);
     case "OR":
-      return drawOrGate(node, false);
+      return drawOrGate(node, false, signalSourceY);
     case "XOR":
-      return drawOrGate(node, true);
+      return drawOrGate(node, true, signalSourceY);
     case "D_FLIP_FLOP":
       return drawFlipFlop(node);
     default:
@@ -154,20 +202,20 @@ function drawNotGate(node) {
 </g>`;
 }
 
-function drawAndGate(node) {
+function drawAndGate(node, signalSourceY) {
   const x = node.x;
   const y = node.y;
   const w = node.width;
   const h = node.height;
   return `<g>
   <path d="M ${x} ${y} L ${x + w * 0.52} ${y} C ${x + w} ${y}, ${x + w} ${y + h}, ${x + w * 0.52} ${y + h} L ${x} ${y + h} Z" fill="#e0f2fe" stroke="#22d3ee" stroke-width="2"/>
-  ${drawInputTicks(node)}
+  ${drawInputTicks(node, signalSourceY)}
   <text x="${x + w / 2}" y="${y + h / 2 + 5}" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="#0f172a">AND</text>
   <text x="${x + w / 2}" y="${y + h + 13}" text-anchor="middle" font-family="Arial" font-size="10" fill="#f8fafc">${escapeXml(shortLabel(node.label))}</text>
 </g>`;
 }
 
-function drawOrGate(node, isXor) {
+function drawOrGate(node, isXor, signalSourceY) {
   const x = node.x;
   const y = node.y;
   const w = node.width;
@@ -177,20 +225,28 @@ function drawOrGate(node, isXor) {
   return `<g>
   ${xorCurve}
   <path d="M ${x + offset} ${y + 2} C ${x + w * 0.34} ${y + 4}, ${x + w * 0.75} ${y + 14}, ${x + w} ${y + h / 2} C ${x + w * 0.75} ${y + h - 14}, ${x + w * 0.34} ${y + h - 4}, ${x + offset} ${y + h - 2} C ${x + 20 + offset} ${y + h / 2}, ${x + 20 + offset} ${y + h / 2}, ${x + offset} ${y + 2} Z" fill="#e0f2fe" stroke="#22d3ee" stroke-width="2"/>
-  ${drawInputTicks(node)}
+  ${drawInputTicks(node, signalSourceY)}
   <text x="${x + w / 2 + 7}" y="${y + h / 2 + 5}" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="#0f172a">${isXor ? "XOR" : "OR"}</text>
   <text x="${x + w / 2}" y="${y + h + 13}" text-anchor="middle" font-family="Arial" font-size="10" fill="#f8fafc">${escapeXml(shortLabel(node.label))}</text>
 </g>`;
 }
 
-function drawInputTicks(node) {
+function drawInputTicks(node, signalSourceY) {
   const inputs = node.inputs || [];
   if (!inputs.length) return "";
-  const gap = node.height / (inputs.length + 1);
+  const margin = 6;
+  // Use source Y if available so tick positions match wire endpoints exactly.
   return inputs
-    .map((input, index) => {
-      const y = node.y + gap * (index + 1);
-      return `<line x1="${node.x - 7}" y1="${y}" x2="${node.x + 7}" y2="${y}" stroke="#67e8f9" stroke-width="2"/><text x="${node.x - 9}" y="${y - 4}" text-anchor="end" font-family="Arial" font-size="9" fill="#a7f3d0">${escapeXml(cleanSignal(input))}</text>`;
+    .map((input) => {
+      let tickY;
+      if (signalSourceY && signalSourceY.has(input)) {
+        const srcY = signalSourceY.get(input);
+        tickY = Math.max(node.y + margin, Math.min(node.y + node.height - margin, srcY));
+      } else {
+        const gap = node.height / (inputs.length + 1);
+        tickY = node.y + gap * (inputs.indexOf(input) + 1);
+      }
+      return `<line x1="${node.x - 7}" y1="${tickY}" x2="${node.x + 7}" y2="${tickY}" stroke="#67e8f9" stroke-width="2"/><text x="${node.x - 9}" y="${tickY - 4}" text-anchor="end" font-family="Arial" font-size="9" fill="#a7f3d0">${escapeXml(cleanSignal(input))}</text>`;
     })
     .join("");
 }
@@ -200,10 +256,16 @@ function drawFlipFlop(node) {
   const y = node.y;
   const w = node.width;
   const h = node.height;
+  const inputs = node.inputs || [];
+  // Draw D and CLK input labels on the left face, Q output label on the right
+  const dLabel = inputs[0] ? cleanSignal(inputs[0]) : "D";
   return `<g>
   <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
-  <text x="${x + w / 2}" y="${y + 28}" text-anchor="middle" font-family="Arial" font-size="13" font-weight="700" fill="#0f172a">D FLIP-FLOP</text>
-  <text x="${x + w / 2}" y="${y + 50}" text-anchor="middle" font-family="Arial" font-size="12" fill="#0f172a">${escapeXml(node.label)}</text>
+  <text x="${x + w / 2}" y="${y + 20}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="700" fill="#0f172a">DFF</text>
+  <text x="${x + 6}" y="${y + 36}" font-family="Arial" font-size="10" fill="#0f172a">D: ${escapeXml(dLabel)}</text>
+  <text x="${x + 6}" y="${y + 50}" font-family="Arial" font-size="10" fill="#0f172a">CLK &gt;</text>
+  <text x="${x + w - 5}" y="${y + 36}" text-anchor="end" font-family="Arial" font-size="10" fill="#0f172a">Q&gt;</text>
+  <text x="${x + w / 2}" y="${y + h + 13}" text-anchor="middle" font-family="Arial" font-size="10" fill="#f8fafc">${escapeXml(shortLabel(node.label))}</text>
 </g>`;
 }
 

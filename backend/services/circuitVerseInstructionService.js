@@ -1,5 +1,5 @@
 function generateInstructions(parsed, circuitModel) {
-  // Build a map from internal signal name → human-readable label
+  // Build a map from internal signal name to human-readable label.
   const signalLabel = new Map();
   parsed.inputs.forEach((name) => signalLabel.set(name, name));
   (circuitModel.gates || []).forEach((gate) => {

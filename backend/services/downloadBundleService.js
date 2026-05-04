@@ -4,21 +4,19 @@ const { generateInstructionsText } = require("./circuitVerseInstructionService")
 
 const bundles = new Map();
 
-function createDownloadBundle({ circuitModel, diagramSvg, truthTable, instructions, simulatorCircuit }) {
+function createDownloadBundle({ circuitModel, diagramSvg, truthTable, instructions, simulatorCircuit, cvAvailable = true }) {
   const id = crypto.randomBytes(10).toString("hex");
   // Use the pre-computed simulatorCircuit JSON if provided; generate a fresh one as fallback.
-  const cvContent = simulatorCircuit
-    ? JSON.stringify(simulatorCircuit, null, 2)
-    : (() => {
-        const { generateExperimentalCvJson } = require("./circuitVerseFileService");
-        return JSON.stringify(generateExperimentalCvJson(circuitModel || {}), null, 2);
-      })();
+  const cvContent =
+    cvAvailable
+      ? simulatorCircuit
+        ? JSON.stringify(simulatorCircuit, null, 2)
+        : (() => {
+            const { generateExperimentalCvJson } = require("./circuitVerseFileService");
+            return JSON.stringify(generateExperimentalCvJson(circuitModel || {}), null, 2);
+          })()
+      : null;
   const artifacts = {
-    cv: {
-      filename: "ai-generated-circuit.cv",
-      contentType: "application/octet-stream",
-      content: cvContent
-    },
     svg: {
       filename: "ai-generated-circuit.svg",
       contentType: "image/svg+xml",
@@ -41,6 +39,14 @@ function createDownloadBundle({ circuitModel, diagramSvg, truthTable, instructio
     }
   };
 
+  if (cvAvailable) {
+    artifacts.cv = {
+      filename: "ai-generated-circuit.cv",
+      contentType: "application/octet-stream",
+      content: cvContent
+    };
+  }
+
   bundles.set(id, artifacts);
   setTimeout(() => bundles.delete(id), 30 * 60 * 1000);
 
@@ -52,7 +58,6 @@ function createDownloadBundle({ circuitModel, diagramSvg, truthTable, instructio
         {
           filename: artifact.filename,
           contentType: artifact.contentType,
-          content: artifact.content,
           downloadUrl: `/api/download/${id}/${type}`
         }
       ])

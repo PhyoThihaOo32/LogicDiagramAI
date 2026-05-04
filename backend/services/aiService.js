@@ -1,4 +1,5 @@
 const { parseLogicQuestion } = require("./logicParser");
+const { parseVhdl, looksLikeVhdl } = require("./vhdlParser");
 
 function createClaudeClient() {
   const Anthropic = require("@anthropic-ai/sdk");
@@ -41,7 +42,8 @@ function coerceParsedCircuit(parsed, fallbackQuestion) {
 }
 
 const CIRCUIT_EXTRACTION_PROMPT = `You are a digital logic circuit designer.
-The user may describe a circuit in natural language ("create a half adder", "make a 3-input AND gate", "build a full adder"), provide Boolean expressions directly ("F = A + B"), ask for a standard sequential circuit, or upload/read a truth table/state table/circuit diagram.
+The user may describe a circuit in natural language ("create a half adder", "make a 3-input AND gate", "build a full adder"), provide Boolean expressions directly ("F = A + B"), provide VHDL source code, ask for a standard sequential circuit, or upload/read a truth table/state table/circuit diagram.
+When given VHDL: parse the entity port declarations for input/output names, read the concurrent signal assignments (output <= expression), and convert VHDL operators (and→AND, or→OR, not→NOT, xor→XOR, nand→NOT(A AND B), nor→NOT(A OR B), xnor→NOT(A XOR B)) to produce correct Boolean expressions.
 Extract or derive the circuit and return strict JSON only with keys:
 type, subtype, inputs, outputs, expressions, flipFlops, stateVariables, stateDiagram, explanation, notes.
 Use AND/OR/NOT/XOR operators in expressions.
@@ -54,6 +56,7 @@ Common circuits to recognise:
 - Half adder: Sum=A XOR B, Carry=A AND B
 - Half subtractor: Difference=A XOR B, Borrow=NOT A AND B
 - Full adder: Sum=A XOR B XOR Cin, Cout=(A AND B) OR (Cin AND (A XOR B))
+- 2-to-4 decoder with inputs A,B and outputs D0-D3: D0=NOT A AND NOT B, D1=NOT A AND B, D2=A AND NOT B, D3=A AND B
 - AND gate (N inputs): F=A AND B [AND C...]
 - OR gate (N inputs): F=A OR B [OR C...]
 - Majority gate (3-input): F=(A AND B) OR (B AND C) OR (A AND C)
@@ -67,6 +70,21 @@ Common circuits to recognise:
 - 4-bit parallel-load register: each Di=(L AND Pi) OR (NOT L AND Qi)`;
 
 const NAMED_CIRCUITS = [
+  {
+    pattern: /(?:2\s*(?:-|to)\s*4|2.?to.?4|two.?to.?four).*decoder|decoder.*(?:2\s*(?:-|to)\s*4|2.?to.?4|two.?to.?four)/i,
+    result: {
+      type: "combinational", subtype: "2-to-4-decoder",
+      inputs: ["A", "B"], outputs: ["D0", "D1", "D2", "D3"],
+      expressions: {
+        D0: "NOT A AND NOT B",
+        D1: "NOT A AND B",
+        D2: "A AND NOT B",
+        D3: "A AND B"
+      },
+      flipFlops: [], stateVariables: [],
+      explanation: "2-to-4 decoder: each output is one minterm of A and B. D0 is active for 00, D1 for 01, D2 for 10, and D3 for 11."
+    }
+  },
   {
     pattern: /half.?adder/i,
     result: {
@@ -244,6 +262,23 @@ async function analyzeQuestion(question) {
   const named = matchNamedCircuit(question);
   if (named) return named;
 
+  // Try VHDL parser before the AI — fast, reliable, no API call needed.
+  if (looksLikeVhdl(question)) {
+    try {
+      return parseVhdl(question);
+    } catch (error) {
+      console.warn("VHDL parser could not handle input; falling back to AI.", error.message);
+    }
+  }
+
+  if (looksLikeEquationInput(question)) {
+    try {
+      return parseLogicQuestion(question);
+    } catch (error) {
+      console.warn("Local equation parser failed; trying AI parser.", error.message);
+    }
+  }
+
   if (process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY) {
     try {
       const client = createClaudeClient();
@@ -280,6 +315,10 @@ async function analyzeQuestion(question) {
     console.warn("OpenAI analysis failed; using local parser.", error.message);
     return parseLogicQuestion(question);
   }
+}
+
+function looksLikeEquationInput(question) {
+  return /(^|\n)\s*[A-Za-z][A-Za-z0-9_]*\s*=/.test(String(question || ""));
 }
 
 async function extractQuestionFromImage(file) {

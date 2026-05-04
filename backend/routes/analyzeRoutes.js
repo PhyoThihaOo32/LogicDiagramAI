@@ -6,7 +6,6 @@ const { buildCircuitModel } = require("../services/circuitModelService");
 const { generateDiagramSvg } = require("../services/circuitDiagramService");
 const { generateInstructions } = require("../services/circuitVerseInstructionService");
 const { createDownloadBundle } = require("../services/downloadBundleService");
-const { generateExperimentalCvJson } = require("../services/circuitVerseFileService");
 
 const router = express.Router();
 const upload = multer({
@@ -42,13 +41,14 @@ router.post("/analyze", handleUpload, async (req, res) => {
     }
 
     const parsed = await analyzeQuestion(question);
+    const cvAvailable = parsed.type !== "sequential";
     const truthTable = generateTruthTable(parsed);
     const circuitModel = buildCircuitModel(parsed);
     circuitModel.projectName = formatCircuitName(parsed);
     const diagramSvg = generateDiagramSvg(circuitModel);
     const instructions = generateInstructions(parsed, circuitModel);
-    const simulatorCircuit = generateExperimentalCvJson(circuitModel);
-    const bundle = createDownloadBundle({ circuitModel, diagramSvg, truthTable, instructions, simulatorCircuit });
+    const simulatorCircuit = cvAvailable ? generateSimulatorCircuit(circuitModel) : null;
+    const bundle = createDownloadBundle({ circuitModel, diagramSvg, truthTable, instructions, simulatorCircuit, cvAvailable });
 
     res.json({
       success: true,
@@ -62,7 +62,7 @@ router.post("/analyze", handleUpload, async (req, res) => {
       simulatorCircuit,
       artifacts: bundle.artifacts,
       downloads: {
-        cvAvailable: true,
+        cvAvailable,
         svgAvailable: true,
         jsonAvailable: true,
         csvAvailable: true,
@@ -92,6 +92,11 @@ function formatCircuitName(parsed) {
     return `Circuit: ${parsed.outputs[0]}`;
   }
   return "AI Generated Circuit";
+}
+
+function generateSimulatorCircuit(circuitModel) {
+  const { generateExperimentalCvJson } = require("../services/circuitVerseFileService");
+  return generateExperimentalCvJson(circuitModel);
 }
 
 module.exports = router;
