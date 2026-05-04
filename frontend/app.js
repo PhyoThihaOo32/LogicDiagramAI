@@ -20,14 +20,6 @@ const imageName = document.querySelector("#imageName");
 const analyzeBtn = document.querySelector("#analyzeBtn");
 const statusBox = document.querySelector("#status");
 const results = document.querySelector("#results");
-const simulatorFrame = document.querySelector("#cvSimulator");
-
-if (simulatorFrame) {
-  simulatorFrame.addEventListener("load", () => {
-    state.simulatorFrameLoaded = simulatorFrame.src !== "about:blank";
-  });
-}
-
 document.querySelectorAll("[data-sample]").forEach((button) => {
   button.addEventListener("click", () => {
     question.value = button.dataset.sample;
@@ -159,11 +151,11 @@ function renderSimulatorPanel(data) {
       <div class="grid">
         <div class="card">
           <h3>Expected State Sequence</h3>
-          <p>${escapeHtml(data.parsed.stateDiagram || "Use the D equations and truth table to step the state bits on each clock.")}</p>
+          <p>${escapeHtml(data.parsed.stateDiagram || "Use the D equations and truth table to step the state bits on each clock edge.")}</p>
         </div>
         <div class="card">
           <h3>Initial State</h3>
-          <p>For a simple traffic light, reset/start with Q1Q0 = 00. That makes Green = 1, Yellow = 0, and Red = 0.</p>
+          <p>${buildInitialStateHint(data.parsed)}</p>
         </div>
       </div>
       <div class="svg-wrap">${data.diagramSvg}</div>
@@ -192,7 +184,7 @@ function renderSummary(data) {
     </div>
     <h3>Expressions</h3>
     <pre>${escapeHtml(JSON.stringify(parsed.expressions, null, 2))}</pre>
-    ${data.imageExtraction ? `<h3>Image Extraction</h3><pre>${escapeHtml(JSON.stringify(data.imageExtraction, null, 2))}</pre>` : ""}
+    ${data.imageExtraction ? `<h3>Image Extraction</h3><div class="card"><p><strong>Extracted question:</strong> ${escapeHtml(data.imageExtraction.question || "(none)")}</p>${data.imageExtraction.confidence !== undefined ? `<p><strong>Confidence:</strong> ${escapeHtml(String(data.imageExtraction.confidence))}</p>` : ""}${data.imageExtraction.notes ? `<p><strong>Notes:</strong> ${escapeHtml(data.imageExtraction.notes)}</p>` : ""}</div>` : ""}
     <h3>Circuit Diagram</h3>
     <div class="svg-wrap">${data.diagramSvg}</div>
     ${parsed.stateDiagram ? `<h3>State Diagram</h3><pre>${escapeHtml(parsed.stateDiagram)}</pre>` : ""}
@@ -329,6 +321,16 @@ function setStatus(message, isError = false) {
   statusBox.hidden = !message;
   statusBox.textContent = message;
   statusBox.classList.toggle("error", isError);
+}
+
+/** Returns a human-readable initial state hint for sequential circuits. */
+function buildInitialStateHint(parsed) {
+  const stateVars = parsed.stateVariables || [];
+  if (!stateVars.length) {
+    return "Reset all flip-flop outputs to 0 before stepping through the state sequence.";
+  }
+  const zeroState = stateVars.map((v) => `${v}=0`).join(", ");
+  return `Typical reset/start state: ${zeroState}. Apply clock pulses and observe Q outputs transition through the state sequence shown in the truth table.`;
 }
 
 function escapeHtml(value) {

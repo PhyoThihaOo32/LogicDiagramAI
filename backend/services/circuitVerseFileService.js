@@ -70,7 +70,7 @@ function buildCircuitVerseScope(circuitModel, scopeId) {
     let constructorParamaters;
     let direction = "RIGHT";
     let labelDirection = "RIGHT";
-    let propagationDelay = 10;
+    let propagationDelay = 100;
 
     const pos = layout.gatePos.get(gate.id) || { x: 250, y: 150 };
     let x = Math.round(pos.x);
