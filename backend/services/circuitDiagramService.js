@@ -95,12 +95,7 @@ function drawWire(wire, nodeMap, signalSourceY) {
   const start = outputAnchor(from);
   const end = inputAnchor(to, wire.signal, signalSourceY);
   const path = wirePath(start, end);
-  const label = wire.signal && !wire.signal.includes("_out") && !wire.signal.includes("_not_")
-    ? `<text x="${start.x + 5}" y="${start.y - 5}" font-family="Arial" font-size="9" fill="#ff8cad">${escapeXml(wire.signal)}</text>`
-    : "";
-
-  return `<path d="${path}" stroke="#f0628a" stroke-width="1.8" fill="none"/>
-${label}`;
+  return `<path d="${path}" stroke="#f0628a" stroke-width="1.8" fill="none"/>`;
 }
 
 function wirePath(start, end) {
@@ -125,33 +120,34 @@ function wirePath(start, end) {
 }
 
 function outputAnchor(node) {
-  // All node types: output exits from the right-centre edge.
-  if (node.type === "NOT") return { x: node.x + node.width + 8, y: node.y + node.height / 2 };
+  if (node.type === "NOT") {
+    // NOT gate: w = node.width - 10; bubble centre = x + w - 2; radius = 5
+    // Right edge of bubble = x + (node.width - 10) - 2 + 5 = x + node.width - 7
+    return { x: node.x + node.width - 7, y: node.y + node.height / 2 };
+  }
   return { x: node.x + node.width, y: node.y + node.height / 2 };
 }
 
 function inputAnchor(node, signal, signalSourceY) {
   const inputs = node.inputs || [];
+  // XOR gate body starts 9 px in from node.x due to the extra curve; OR/AND start at node.x
+  const edgeX = node.type === "XOR" ? node.x + 9 : node.x;
+
   if (inputs.length <= 1) {
-    // Single-input node: centre of left edge
-    return { x: node.x, y: node.y + node.height / 2 };
+    return { x: edgeX, y: node.y + node.height / 2 };
+  }
+
+  const margin = 6;
+
+  if (signalSourceY && signalSourceY.has(signal)) {
+    const srcY = signalSourceY.get(signal);
+    const clampedY = Math.max(node.y + margin, Math.min(node.y + node.height - margin, srcY));
+    return { x: edgeX, y: clampedY };
   }
 
   const index = Math.max(0, inputs.indexOf(signal));
-
-  // Prefer snapping to the actual source wire Y so the input tick aligns with
-  // the incoming wire and prevents visually upward wires on tightly-spaced gates.
-  if (signalSourceY && signalSourceY.has(signal)) {
-    const srcY = signalSourceY.get(signal);
-    // Clamp to the gate's vertical extent with a small margin so the tick stays on-gate
-    const margin = 6;
-    const clampedY = Math.max(node.y + margin, Math.min(node.y + node.height - margin, srcY));
-    return { x: node.x, y: clampedY };
-  }
-
-  // Fallback: evenly distribute inputs within gate height
   const gap = node.height / (inputs.length + 1);
-  return { x: node.x, y: node.y + gap * (index + 1) };
+  return { x: edgeX, y: node.y + gap * (index + 1) };
 }
 
 function drawNode(node, signalSourceY) {
@@ -233,7 +229,8 @@ function drawInputTicks(node, signalSourceY) {
   const inputs = node.inputs || [];
   if (!inputs.length) return "";
   const margin = 6;
-  // Use source Y if available so tick positions match wire endpoints exactly.
+  // XOR gate body starts 9px in; AND/OR bodies start at node.x
+  const edgeX = node.type === "XOR" ? node.x + 9 : node.x;
   return inputs
     .map((input) => {
       let tickY;
@@ -244,7 +241,8 @@ function drawInputTicks(node, signalSourceY) {
         const gap = node.height / (inputs.length + 1);
         tickY = node.y + gap * (inputs.indexOf(input) + 1);
       }
-      return `<line x1="${node.x - 7}" y1="${tickY}" x2="${node.x + 7}" y2="${tickY}" stroke="#f0628a" stroke-width="1.5"/><text x="${node.x - 9}" y="${tickY - 4}" text-anchor="end" font-family="Arial" font-size="9" fill="#ff8cad">${escapeXml(cleanSignal(input))}</text>`;
+      // Tick drawn only outside the gate body — stops exactly at the gate edge.
+      return `<line x1="${edgeX - 10}" y1="${tickY}" x2="${edgeX}" y2="${tickY}" stroke="#f0628a" stroke-width="1.5"/>`;
     })
     .join("");
 }
