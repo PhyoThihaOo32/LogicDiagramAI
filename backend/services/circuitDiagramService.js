@@ -56,12 +56,12 @@ function generateDiagramSvg(circuitModel) {
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Generated circuit diagram">
 <defs>
   <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-    <path d="M 0 0 L 10 5 L 0 10 z" fill="#67e8f9"/>
+    <path d="M 0 0 L 10 5 L 0 10 z" fill="#f0628a"/>
   </marker>
 </defs>
-<rect width="100%" height="100%" fill="#08111f"/>
-<text x="24" y="28" font-family="Arial" font-size="16" font-weight="700" fill="#f8fafc">${escapeXml(circuitModel.projectName || "AI Generated Circuit")}</text>
-<text x="24" y="48" font-family="Arial" font-size="11" fill="#9fb6c8">${escapeXml(buildSubtitle(circuitModel))}</text>
+<rect width="100%" height="100%" fill="#0a0a0a"/>
+<text x="24" y="28" font-family="Arial" font-size="16" font-weight="700" fill="#f0628a" letter-spacing="2">${escapeXml(circuitModel.projectName || "AI Generated Circuit")}</text>
+<text x="24" y="48" font-family="Arial" font-size="11" fill="#666666">${escapeXml(buildSubtitle(circuitModel))}</text>
 ${wires}
 ${nodes}
 </svg>`;
@@ -100,10 +100,10 @@ function drawWire(wire, nodeMap, signalSourceY) {
   const end = inputAnchor(to, wire.signal, signalSourceY);
   const path = wirePath(start, end);
   const label = wire.signal && !wire.signal.includes("_out") && !wire.signal.includes("_not_")
-    ? `<text x="${start.x + 5}" y="${start.y - 5}" font-family="Arial" font-size="9" fill="#a7f3d0">${escapeXml(wire.signal)}</text>`
+    ? `<text x="${start.x + 5}" y="${start.y - 5}" font-family="Arial" font-size="9" fill="#ff8cad">${escapeXml(wire.signal)}</text>`
     : "";
 
-  return `<path d="${path}" stroke="#67e8f9" stroke-width="2.2" fill="none" marker-end="url(#arrow)"/>
+  return `<path d="${path}" stroke="#f0628a" stroke-width="1.8" fill="none" marker-end="url(#arrow)"/>
 ${label}`;
 }
 
@@ -161,9 +161,9 @@ function inputAnchor(node, signal, signalSourceY) {
 function drawNode(node, signalSourceY) {
   switch (node.type) {
     case "INPUT":
-      return drawPin(node, "#cffafe", "#0891b2");
+      return drawPin(node, "#1e0710", "#f0628a");
     case "OUTPUT":
-      return drawPin(node, "#f8fafc", "#0891b2");
+      return drawPin(node, "#2a0f1a", "#f0628a");
     case "NOT":
       return drawNotGate(node);
     case "AND":
@@ -175,7 +175,7 @@ function drawNode(node, signalSourceY) {
     case "D_FLIP_FLOP":
       return drawFlipFlop(node);
     default:
-      return drawPin(node, "#e0f2fe", "#0891b2");
+      return drawPin(node, "#1e0710", "#f0628a");
   }
 }
 
@@ -185,8 +185,8 @@ function drawPin(node, fill, stroke) {
   const w = node.width;
   const h = node.height;
   return `<g>
-  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="${fill}" stroke="${stroke}" stroke-width="2"/>
-  <text x="${x + w / 2}" y="${y + h / 2 + 5}" text-anchor="middle" font-family="Arial" font-size="13" font-weight="700" fill="#0f172a">${escapeXml(node.label || node.id)}</text>
+  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
+  <text x="${x + w / 2}" y="${y + h / 2 + 5}" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="#f0f0f0">${escapeXml(node.label || node.id)}</text>
 </g>`;
 }
 
@@ -196,9 +196,9 @@ function drawNotGate(node) {
   const h = node.height;
   const w = node.width - 10;
   return `<g>
-  <path d="M ${x} ${y + 6} L ${x} ${y + h - 6} L ${x + w - 10} ${y + h / 2} Z" fill="#e0f2fe" stroke="#22d3ee" stroke-width="2"/>
-  <circle cx="${x + w - 2}" cy="${y + h / 2}" r="5" fill="#08111f" stroke="#22d3ee" stroke-width="2"/>
-  <text x="${x + w / 2 - 5}" y="${y + h + 13}" text-anchor="middle" font-family="Arial" font-size="11" fill="#f8fafc">${escapeXml(node.label)}</text>
+  <path d="M ${x} ${y + 6} L ${x} ${y + h - 6} L ${x + w - 10} ${y + h / 2} Z" fill="#1e0710" stroke="#f0628a" stroke-width="1.5"/>
+  <circle cx="${x + w - 2}" cy="${y + h / 2}" r="5" fill="#0a0a0a" stroke="#f0628a" stroke-width="1.5"/>
+  <text x="${x + w / 2 - 5}" y="${y + h + 13}" text-anchor="middle" font-family="Arial" font-size="10" fill="#f0628a">${escapeXml(node.label)}</text>
 </g>`;
 }
 
@@ -208,10 +208,10 @@ function drawAndGate(node, signalSourceY) {
   const w = node.width;
   const h = node.height;
   return `<g>
-  <path d="M ${x} ${y} L ${x + w * 0.52} ${y} C ${x + w} ${y}, ${x + w} ${y + h}, ${x + w * 0.52} ${y + h} L ${x} ${y + h} Z" fill="#e0f2fe" stroke="#22d3ee" stroke-width="2"/>
+  <path d="M ${x} ${y} L ${x + w * 0.52} ${y} C ${x + w} ${y}, ${x + w} ${y + h}, ${x + w * 0.52} ${y + h} L ${x} ${y + h} Z" fill="#1e0710" stroke="#f0628a" stroke-width="1.5"/>
   ${drawInputTicks(node, signalSourceY)}
-  <text x="${x + w / 2}" y="${y + h / 2 + 5}" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="#0f172a">AND</text>
-  <text x="${x + w / 2}" y="${y + h + 13}" text-anchor="middle" font-family="Arial" font-size="10" fill="#f8fafc">${escapeXml(shortLabel(node.label))}</text>
+  <text x="${x + w / 2}" y="${y + h / 2 + 5}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="700" fill="#f0628a">AND</text>
+  <text x="${x + w / 2}" y="${y + h + 13}" text-anchor="middle" font-family="Arial" font-size="10" fill="#808080">${escapeXml(shortLabel(node.label))}</text>
 </g>`;
 }
 
@@ -221,13 +221,13 @@ function drawOrGate(node, isXor, signalSourceY) {
   const w = node.width;
   const h = node.height;
   const offset = isXor ? 9 : 0;
-  const xorCurve = isXor ? `<path d="M ${x} ${y + 3} C ${x + 18} ${y + h / 2}, ${x + 18} ${y + h / 2}, ${x} ${y + h - 3}" fill="none" stroke="#22d3ee" stroke-width="2"/>` : "";
+  const xorCurve = isXor ? `<path d="M ${x} ${y + 3} C ${x + 18} ${y + h / 2}, ${x + 18} ${y + h / 2}, ${x} ${y + h - 3}" fill="none" stroke="#f0628a" stroke-width="1.5"/>` : "";
   return `<g>
   ${xorCurve}
-  <path d="M ${x + offset} ${y + 2} C ${x + w * 0.34} ${y + 4}, ${x + w * 0.75} ${y + 14}, ${x + w} ${y + h / 2} C ${x + w * 0.75} ${y + h - 14}, ${x + w * 0.34} ${y + h - 4}, ${x + offset} ${y + h - 2} C ${x + 20 + offset} ${y + h / 2}, ${x + 20 + offset} ${y + h / 2}, ${x + offset} ${y + 2} Z" fill="#e0f2fe" stroke="#22d3ee" stroke-width="2"/>
+  <path d="M ${x + offset} ${y + 2} C ${x + w * 0.34} ${y + 4}, ${x + w * 0.75} ${y + 14}, ${x + w} ${y + h / 2} C ${x + w * 0.75} ${y + h - 14}, ${x + w * 0.34} ${y + h - 4}, ${x + offset} ${y + h - 2} C ${x + 20 + offset} ${y + h / 2}, ${x + 20 + offset} ${y + h / 2}, ${x + offset} ${y + 2} Z" fill="#1e0710" stroke="#f0628a" stroke-width="1.5"/>
   ${drawInputTicks(node, signalSourceY)}
-  <text x="${x + w / 2 + 7}" y="${y + h / 2 + 5}" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="#0f172a">${isXor ? "XOR" : "OR"}</text>
-  <text x="${x + w / 2}" y="${y + h + 13}" text-anchor="middle" font-family="Arial" font-size="10" fill="#f8fafc">${escapeXml(shortLabel(node.label))}</text>
+  <text x="${x + w / 2 + 7}" y="${y + h / 2 + 5}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="700" fill="#f0628a">${isXor ? "XOR" : "OR"}</text>
+  <text x="${x + w / 2}" y="${y + h + 13}" text-anchor="middle" font-family="Arial" font-size="10" fill="#808080">${escapeXml(shortLabel(node.label))}</text>
 </g>`;
 }
 
@@ -246,7 +246,7 @@ function drawInputTicks(node, signalSourceY) {
         const gap = node.height / (inputs.length + 1);
         tickY = node.y + gap * (inputs.indexOf(input) + 1);
       }
-      return `<line x1="${node.x - 7}" y1="${tickY}" x2="${node.x + 7}" y2="${tickY}" stroke="#67e8f9" stroke-width="2"/><text x="${node.x - 9}" y="${tickY - 4}" text-anchor="end" font-family="Arial" font-size="9" fill="#a7f3d0">${escapeXml(cleanSignal(input))}</text>`;
+      return `<line x1="${node.x - 7}" y1="${tickY}" x2="${node.x + 7}" y2="${tickY}" stroke="#f0628a" stroke-width="1.5"/><text x="${node.x - 9}" y="${tickY - 4}" text-anchor="end" font-family="Arial" font-size="9" fill="#ff8cad">${escapeXml(cleanSignal(input))}</text>`;
     })
     .join("");
 }
@@ -260,12 +260,12 @@ function drawFlipFlop(node) {
   // Draw D and CLK input labels on the left face, Q output label on the right
   const dLabel = inputs[0] ? cleanSignal(inputs[0]) : "D";
   return `<g>
-  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="#fef3c7" stroke="#f59e0b" stroke-width="2"/>
-  <text x="${x + w / 2}" y="${y + 20}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="700" fill="#0f172a">DFF</text>
-  <text x="${x + 6}" y="${y + 36}" font-family="Arial" font-size="10" fill="#0f172a">D: ${escapeXml(dLabel)}</text>
-  <text x="${x + 6}" y="${y + 50}" font-family="Arial" font-size="10" fill="#0f172a">CLK &gt;</text>
-  <text x="${x + w - 5}" y="${y + 36}" text-anchor="end" font-family="Arial" font-size="10" fill="#0f172a">Q&gt;</text>
-  <text x="${x + w / 2}" y="${y + h + 13}" text-anchor="middle" font-family="Arial" font-size="10" fill="#f8fafc">${escapeXml(shortLabel(node.label))}</text>
+  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="8" fill="#1e0710" stroke="#f0628a" stroke-width="1.5"/>
+  <text x="${x + w / 2}" y="${y + 20}" text-anchor="middle" font-family="Arial" font-size="11" font-weight="700" fill="#f0628a">DFF</text>
+  <text x="${x + 6}" y="${y + 36}" font-family="Arial" font-size="10" fill="#ff8cad">D: ${escapeXml(dLabel)}</text>
+  <text x="${x + 6}" y="${y + 50}" font-family="Arial" font-size="10" fill="#ff8cad">CLK &gt;</text>
+  <text x="${x + w - 5}" y="${y + 36}" text-anchor="end" font-family="Arial" font-size="10" fill="#ff8cad">Q&gt;</text>
+  <text x="${x + w / 2}" y="${y + h + 13}" text-anchor="middle" font-family="Arial" font-size="10" fill="#808080">${escapeXml(shortLabel(node.label))}</text>
 </g>`;
 }
 

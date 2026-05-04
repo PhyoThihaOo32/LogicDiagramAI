@@ -1,14 +1,14 @@
 :root {
   color-scheme: dark;
-  --bg: #07111f;
-  --panel: #0d1b2f;
-  --panel-2: #10233d;
-  --text: #f8fafc;
-  --muted: #a7b4c7;
-  --accent: #22d3ee;
-  --accent-2: #38bdf8;
-  --line: rgba(148, 163, 184, 0.24);
-  --danger: #fca5a5;
+  --bg: #0a0a0a;
+  --panel: #0f0f0f;
+  --panel-2: #161616;
+  --text: #f0f0f0;
+  --muted: #808080;
+  --accent: #f0628a;
+  --accent-2: #ff8cad;
+  --line: rgba(240, 98, 138, 0.18);
+  --danger: #ff6b6b;
 }
 
 * {
@@ -19,7 +19,22 @@ body {
   margin: 0;
   min-height: 100vh;
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  background: radial-gradient(circle at top left, rgba(34, 211, 238, 0.16), transparent 28%), var(--bg);
+  background-color: var(--bg);
+  background-image:
+    repeating-linear-gradient(
+      45deg,
+      rgba(240, 98, 138, 0.035) 0px,
+      rgba(240, 98, 138, 0.035) 1px,
+      transparent 1px,
+      transparent 48px
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(240, 98, 138, 0.035) 0px,
+      rgba(240, 98, 138, 0.035) 1px,
+      transparent 1px,
+      transparent 48px
+    );
   color: var(--text);
 }
 
@@ -36,14 +51,19 @@ body {
 
 h1 {
   margin: 0;
-  font-size: clamp(2rem, 6vw, 4rem);
+  font-size: clamp(1.6rem, 5vw, 3.2rem);
   line-height: 1;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .hero p {
   margin: 12px 0 0;
   color: var(--muted);
-  font-size: 1.1rem;
+  font-size: 1rem;
+  letter-spacing: 0.03em;
 }
 
 .shell {
@@ -53,10 +73,10 @@ h1 {
 .panel,
 .results,
 .status {
-  background: rgba(13, 27, 47, 0.88);
+  background: rgba(15, 15, 15, 0.92);
   border: 1px solid var(--line);
   border-radius: 14px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.24);
+  box-shadow: 0 0 40px rgba(240, 98, 138, 0.06), 0 20px 60px rgba(0, 0, 0, 0.5);
 }
 
 .input-panel {
@@ -66,19 +86,29 @@ h1 {
 label {
   display: block;
   margin-bottom: 10px;
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  color: var(--muted);
 }
 
 textarea {
   width: 100%;
   min-height: 170px;
   resize: vertical;
-  border: 1px solid rgba(34, 211, 238, 0.34);
+  border: 1px solid rgba(240, 98, 138, 0.28);
   border-radius: 10px;
   padding: 16px;
-  background: #06101d;
+  background: #0a0a0a;
   color: var(--text);
   font: 1rem/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  transition: border-color 0.2s;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
 }
 
 button {
@@ -88,8 +118,10 @@ button {
   padding: 9px 14px;
   background: var(--panel-2);
   color: var(--text);
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
 }
 
 .download-button {
@@ -102,19 +134,32 @@ button {
   padding: 9px 14px;
   background: var(--panel-2);
   color: var(--text);
-  font-weight: 700;
+  font-weight: 600;
+  letter-spacing: 0.04em;
   text-decoration: none;
+  transition: border-color 0.2s, background 0.2s;
 }
 
 button:hover,
 .download-button:hover {
   border-color: var(--accent);
+  background: rgba(240, 98, 138, 0.1);
 }
 
 .primary {
   margin-top: 16px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
-  color: #04202a;
+  background: var(--accent);
+  color: #1a0008;
+  border: 0;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-size: 0.88rem;
+  box-shadow: 0 0 20px rgba(240, 98, 138, 0.3);
+}
+
+.primary:hover {
+  background: var(--accent-2);
   border: 0;
 }
 
@@ -145,6 +190,11 @@ button:hover,
   background: var(--panel-2);
   color: var(--text);
   cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.file-label:hover {
+  border-color: var(--accent);
 }
 
 input[type="file"] {
@@ -163,6 +213,7 @@ input[type="file"] {
 
 .status.error {
   color: var(--danger);
+  border-color: rgba(255, 107, 107, 0.3);
 }
 
 .results {
@@ -185,7 +236,8 @@ input[type="file"] {
 
 .tabs button.active {
   background: var(--accent);
-  color: #04202a;
+  color: #1a0008;
+  border-color: transparent;
 }
 
 .tab-panel {
@@ -217,7 +269,7 @@ input[type="file"] {
   height: 100%;
   border: 0;
   display: block;
-  background: #06101d;
+  background: #0a0a0a;
 }
 
 .grid {
@@ -230,12 +282,15 @@ input[type="file"] {
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(16, 35, 61, 0.72);
+  background: rgba(22, 22, 22, 0.8);
 }
 
 .card h3 {
   margin: 0 0 10px;
-  font-size: 1rem;
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
 }
 
 pre,
@@ -247,7 +302,7 @@ pre {
   overflow: auto;
   padding: 14px;
   border-radius: 10px;
-  background: #06101d;
+  background: #0a0a0a;
   border: 1px solid var(--line);
 }
 
@@ -266,15 +321,18 @@ td {
 }
 
 th {
-  background: #10233d;
+  background: #161616;
   color: var(--accent);
+  letter-spacing: 0.06em;
+  font-size: 0.82rem;
+  text-transform: uppercase;
 }
 
 .svg-wrap {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: #06101d;
+  background: #0a0a0a;
 }
 
 .svg-wrap svg {
@@ -293,10 +351,10 @@ th {
 
 .notice {
   padding: 14px;
-  border: 1px solid rgba(34, 211, 238, 0.32);
+  border: 1px solid rgba(240, 98, 138, 0.28);
   border-radius: 10px;
-  background: rgba(34, 211, 238, 0.08);
-  color: #dffbff;
+  background: rgba(240, 98, 138, 0.06);
+  color: #ffd5e2;
 }
 
 .manual-download {
@@ -304,7 +362,7 @@ th {
   padding: 16px;
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: rgba(16, 35, 61, 0.72);
+  background: rgba(22, 22, 22, 0.8);
 }
 
 .manual-download textarea {
@@ -321,6 +379,10 @@ ol {
 
 li {
   margin: 8px 0;
+}
+
+h3 {
+  color: var(--text);
 }
 
 @media (max-width: 640px) {
