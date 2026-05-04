@@ -174,6 +174,8 @@ function drawNode(node, signalSourceY) {
       return drawOrGate(node, true, signalSourceY);
     case "D_FLIP_FLOP":
       return drawFlipFlop(node);
+    case "CONST":
+      return drawPin(node, "#1a1a1a", "#808080");
     default:
       return drawPin(node, "#1e0710", "#f0628a");
   }

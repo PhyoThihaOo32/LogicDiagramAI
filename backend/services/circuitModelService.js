@@ -23,7 +23,7 @@ function buildCircuitModel(parsed) {
     }
   };
 
-  const counters = { NOT: 0, AND: 0, OR: 0, XOR: 0 };
+  const counters = { NOT: 0, AND: 0, OR: 0, XOR: 0, CONST: 0 };
   // Shared gate cache keyed by canonical AST text; avoids duplicate gates for
   // repeated subexpressions (e.g. A'B' appearing in multiple minterms).
   const gateCache = new Map();
@@ -259,7 +259,24 @@ function buildAstGates(ast, model, context, layout) {
     return { signal: ast.name, sourceId: ast.name };
   }
   if (ast.type === "CONST") {
-    return { signal: String(ast.value), sourceId: String(ast.value) };
+    // Synthesise a CONST gate so the wire has a valid sourceId in the model.
+    // Use the gateCache so repeated constants share one gate node.
+    const cacheKey = `__CONST_${ast.value}`;
+    if (gateCache.has(cacheKey)) return gateCache.get(cacheKey);
+    const signal = String(ast.value);
+    const constId = `const_${ast.value}_${++counters.CONST}`;
+    model.gates.push({
+      id: constId,
+      type: "CONST",
+      label: signal,
+      x: 34,
+      y: 95,
+      inputs: [],
+      output: signal
+    });
+    const result = { signal, sourceId: constId };
+    gateCache.set(cacheKey, result);
+    return result;
   }
 
   // Check shared gate cache before building a new gate.
