@@ -54,11 +54,7 @@ function generateDiagramSvg(circuitModel) {
   const nodes = [...inputNodes, ...gates.map(normalizeNode)].map((n) => drawNode(n, signalSourceY)).join("\n");
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Generated circuit diagram">
-<defs>
-  <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse">
-    <path d="M 0 0 L 10 5 L 0 10 z" fill="#f0628a"/>
-  </marker>
-</defs>
+<defs/>
 <rect width="100%" height="100%" fill="#0a0a0a"/>
 <text x="24" y="28" font-family="Arial" font-size="16" font-weight="700" fill="#f0628a" letter-spacing="2">${escapeXml(circuitModel.projectName || "AI Generated Circuit")}</text>
 <text x="24" y="48" font-family="Arial" font-size="11" fill="#666666">${escapeXml(buildSubtitle(circuitModel))}</text>
@@ -103,7 +99,7 @@ function drawWire(wire, nodeMap, signalSourceY) {
     ? `<text x="${start.x + 5}" y="${start.y - 5}" font-family="Arial" font-size="9" fill="#ff8cad">${escapeXml(wire.signal)}</text>`
     : "";
 
-  return `<path d="${path}" stroke="#f0628a" stroke-width="1.8" fill="none" marker-end="url(#arrow)"/>
+  return `<path d="${path}" stroke="#f0628a" stroke-width="1.8" fill="none"/>
 ${label}`;
 }
 
