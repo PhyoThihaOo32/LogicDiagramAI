@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: ai-logic-diagram-generator
+    runtime: node
+    buildCommand: cd backend && npm install
+    startCommand: cd backend && node server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CLAUDE_MODEL
+        value: claude-sonnet-4-5
+      - key: CLAUDE_VISION_MODEL
+        value: claude-sonnet-4-5

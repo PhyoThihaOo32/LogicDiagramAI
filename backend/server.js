@@ -59,14 +59,19 @@ app.get("*", (req, res) => {
   res.sendFile(path.join(__dirname, "../frontend/index.html"));
 });
 
-const server = app.listen(PORT, HOST, () => {
-  console.log(`AI Logic Diagram Generator running at http://${HOST}:${PORT}`);
-});
+// Export for Vercel serverless — Vercel imports the module and calls it directly.
+// When run locally (node server.js) we still call listen() as normal.
+if (require.main === module) {
+  const server = app.listen(PORT, HOST, () => {
+    console.log(`AI Logic Diagram Generator running at http://${HOST}:${PORT}`);
+  });
+  server.on("error", (error) => {
+    if (error.code === "EADDRINUSE") {
+      console.error(`Port ${PORT} is already in use on ${HOST}. Stop the existing server or set PORT to another value.`);
+      process.exit(1);
+    }
+    throw error;
+  });
+}
 
-server.on("error", (error) => {
-  if (error.code === "EADDRINUSE") {
-    console.error(`Port ${PORT} is already in use on ${HOST}. Stop the existing server or set PORT to another value.`);
-    process.exit(1);
-  }
-  throw error;
-});
+module.exports = app;
