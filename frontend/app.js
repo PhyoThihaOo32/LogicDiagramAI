@@ -25,14 +25,32 @@ imageInput.addEventListener("change", () => {
   imageName.textContent = imageInput.files[0] ? imageInput.files[0].name : "No image selected";
 });
 
+// Quick-fill example chips
+document.querySelectorAll(".chip[data-fill]").forEach((chip) => {
+  chip.addEventListener("click", () => {
+    question.value = chip.dataset.fill;
+    question.focus();
+  });
+});
+
 if (window.location.protocol === "file:") {
   setStatus("Running from a local file. The app will use the backend at http://127.0.0.1:3000; for the most reliable experience, open that URL directly.");
+}
+
+function setAnalyzeLoading(loading) {
+  analyzeBtn.disabled = loading;
+  const icon = analyzeBtn.querySelector(".btn-icon");
+  const text = analyzeBtn.querySelector(".btn-text");
+  const loader = analyzeBtn.querySelector(".btn-loader");
+  if (icon) icon.hidden = loading;
+  if (text) text.hidden = loading;
+  if (loader) loader.hidden = !loading;
 }
 
 async function analyze(event) {
   if (event) event.preventDefault();
   setStatus(imageInput.files[0] ? "Reading image and generating circuit..." : "Generating circuit...");
-  analyzeBtn.disabled = true;
+  setAnalyzeLoading(true);
   try {
     const form = new FormData();
     form.append("question", question.value);
@@ -53,7 +71,7 @@ async function analyze(event) {
   } catch (error) {
     setStatus(error.message, true);
   } finally {
-    analyzeBtn.disabled = false;
+    setAnalyzeLoading(false);
   }
 }
 
@@ -213,14 +231,22 @@ function renderTruthTable(rows, verification) {
     return;
   }
   const headers = Object.keys(rows[0]);
+  const inputCols = headers.length > 1 ? headers.slice(0, -1) : [];
+  const outputCols = headers.length > 1 ? headers.slice(-1) : headers;
   document.querySelector("#truth").innerHTML = `
     ${badge}
-    <table>
-      <thead><tr>${headers.map((header) => `<th>${escapeHtml(header)}</th>`).join("")}</tr></thead>
-      <tbody>
-        ${rows.map((row) => `<tr>${headers.map((header) => `<td>${escapeHtml(row[header])}</td>`).join("")}</tr>`).join("")}
-      </tbody>
-    </table>
+    <div class="table-wrap">
+      <table>
+        <thead><tr>${headers.map((h) => `<th>${escapeHtml(h)}</th>`).join("")}</tr></thead>
+        <tbody>
+          ${rows.map((row) => `<tr>${headers.map((h, i) => {
+            const val = String(row[h] ?? "");
+            const isOut = i === headers.length - 1 && headers.length > 1;
+            return `<td${isOut ? ` data-output="${escapeHtml(val)}"` : ""}>${escapeHtml(val)}</td>`;
+          }).join("")}</tr>`).join("")}
+        </tbody>
+      </table>
+    </div>
   `;
 }
 
@@ -245,7 +271,7 @@ function renderDownloads(data) {
       ${isSequential ? " Sequential CircuitVerse .cv export is hidden because D flip-flop feedback import is not reliable yet." : " CircuitVerse .cv export is experimental and should be verified in CircuitVerse."}
     </div>
     <div class="downloads">
-      ${links.map((link) => `<a class="download-button" href="${link.url}" download="${link.filename}" target="_blank" data-artifact="${link.type}">${link.label}</a>`).join("")}
+      ${links.map((link) => `<a class="download-button" href="${link.url}" download="${link.filename}" target="_blank" data-artifact="${link.type}"><span class="dl-icon">${dlIcon(link.type)}</span>${link.label}</a>`).join("")}
     </div>
     <div id="manualDownload" class="manual-download" hidden></div>
     <div class="card">
@@ -357,6 +383,11 @@ function buildInitialStateHint(parsed) {
   }
   const zeroState = stateVars.map((v) => `${v}=0`).join(", ");
   return `Typical reset/start state: ${zeroState}. Apply clock pulses and observe Q outputs transition through the state sequence shown in the truth table.`;
+}
+
+function dlIcon(type) {
+  const icons = { cv: "🔌", svg: "🖼", csv: "📊", txt: "📋", json: "🗂" };
+  return icons[type] || "📄";
 }
 
 function escapeHtml(value) {

@@ -3,38 +3,66 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>AI Logic Diagram Generator</title>
-    <link rel="stylesheet" href="styles.css?v=20260504-12" />
+    <title>Logic Diagram AI</title>
+    <link rel="stylesheet" href="styles.css?v=20260504-13" />
   </head>
   <body>
+    <!-- Animated background orbs -->
+    <div class="bg-orb bg-orb-1"></div>
+    <div class="bg-orb bg-orb-2"></div>
+    <div class="bg-orb bg-orb-3"></div>
+
     <header class="hero">
-      <div>
-        <h1>AI Logic Diagram Generator</h1>
-        <p>Enter a digital logic question and generate a circuit diagram, truth table, and explanation.</p>
+      <div class="hero-inner">
+        <div class="hero-badge"><span class="badge-dot"></span>AI-Powered · Beta</div>
+        <h1>Logic Diagram <span class="title-accent">AI</span></h1>
+        <p>Describe any digital circuit in plain English, paste Boolean expressions, or upload an image — get a diagram, truth table, VHDL, and live simulator instantly.</p>
       </div>
     </header>
 
     <main class="shell">
       <section class="panel input-panel">
-        <label for="question">Logic question</label>
-        <textarea id="question" spellcheck="false">F = A’B’ + B’C’</textarea>
-        <div class="upload-row">
-          <label class="file-label" for="imageInput">Upload question image</label>
-          <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
-          <span id="imageName">No image selected</span>
+        <div class="input-header">
+          <label for="question">Circuit Description</label>
+          <div class="examples-row">
+            <span class="examples-label">Quick fill:</span>
+            <button type="button" class="chip" data-fill="Half adder">Half adder</button>
+            <button type="button" class="chip" data-fill="Full adder">Full adder</button>
+            <button type="button" class="chip" data-fill="NAND gate">NAND gate</button>
+            <button type="button" class="chip" data-fill="NOR gate">NOR gate</button>
+            <button type="button" class="chip" data-fill="2-to-4 decoder">2:4 Decoder</button>
+            <button type="button" class="chip" data-fill="F = A'B' + B'C'">SOP expr</button>
+          </div>
         </div>
-<button id="analyzeBtn" type="button" class="primary">Generate Circuit</button>
+        <textarea id="question" spellcheck="false" placeholder="e.g. 'create a half adder'  ·  'F = A&apos;B + AB&apos;'  ·  paste VHDL...">F = A'B' + B'C'</textarea>
+        <div class="input-footer">
+          <div class="upload-row">
+            <label class="file-label" for="imageInput">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+              Upload Image
+            </label>
+            <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
+            <span id="imageName" class="image-name">No image selected</span>
+          </div>
+          <button id="analyzeBtn" type="button" class="primary">
+            <span class="btn-icon">⚡</span>
+            <span class="btn-text">Generate Circuit</span>
+            <span class="btn-loader" hidden>
+              <span class="dot">·</span><span class="dot">·</span><span class="dot">·</span>
+            </span>
+          </button>
+        </div>
       </section>
 
       <section id="status" class="status" hidden></section>
 
       <section id="results" class="results" hidden>
         <nav class="tabs" aria-label="Results tabs">
-          <button class="active" data-tab="summary">Logic Summary</button>
-          <button data-tab="truth">Truth Table</button>
-          <button data-tab="steps">Build Steps</button>
-          <button data-tab="downloads">Downloads</button>
-          <button data-tab="simulator">CircuitVerse Simulator</button>
+          <button class="active" data-tab="summary"><span class="tab-icon">◈</span> Summary</button>
+          <button data-tab="truth"><span class="tab-icon">⊞</span> Truth Table</button>
+          <button data-tab="steps"><span class="tab-icon">◎</span> Build Steps</button>
+          <button data-tab="downloads"><span class="tab-icon">⬇</span> Downloads</button>
+          <button data-tab="simulator"><span class="tab-icon">◉</span> Simulator</button>
         </nav>
 
         <section id="summary" class="tab-panel active"></section>
@@ -48,6 +76,6 @@
     </main>
 
     <iframe id="downloadFrame" name="downloadFrame" hidden></iframe>
-    <script src="app.js?v=20260504-12"></script>
+    <script src="app.js?v=20260504-13"></script>
   </body>
 </html>
