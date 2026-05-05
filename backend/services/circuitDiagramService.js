@@ -63,20 +63,19 @@ ${nodes}
 </svg>`;
 }
 
+const DIAGRAM_BASE = {
+  INPUT: [92, 36], OUTPUT: [76, 32], NOT: [58, 42],
+  AND: [76, 50], OR: [82, 52], XOR: [88, 52],
+  NAND: [86, 50], NOR: [92, 52], XNOR: [98, 52],
+  D_FLIP_FLOP: [104, 62]
+};
+const DIAGRAM_SCALABLE = new Set(["AND", "OR", "XOR", "NAND", "NOR", "XNOR"]);
+
 function normalizeNode(node) {
-  const sizes = {
-    INPUT: [92, 36],
-    OUTPUT: [76, 32],
-    NOT: [58, 42],
-    AND: [76, 50],
-    OR: [82, 52],
-    XOR: [88, 52],
-    NAND: [86, 50],  // AND body (76) + bubble gap (5) + bubble radius (5)
-    NOR: [92, 52],   // OR  body (82) + bubble gap (5) + bubble radius (5)
-    XNOR: [98, 52],  // XOR body (88) + bubble gap (5) + bubble radius (5)
-    D_FLIP_FLOP: [104, 62]
-  };
-  const [width, height] = sizes[node.type] || [104, 58];
+  const [width, baseH] = DIAGRAM_BASE[node.type] || [104, 58];
+  const n = (node.inputs || []).length;
+  // Scale height by 16px for each input beyond 2 so all input ticks fit.
+  const height = (DIAGRAM_SCALABLE.has(node.type) && n > 2) ? baseH + (n - 2) * 16 : baseH;
   return { ...node, width, height };
 }
 

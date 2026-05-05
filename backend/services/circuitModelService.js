@@ -80,7 +80,7 @@ function buildCircuitModel(parsed) {
       const dInputSourceId = logic ? logic.sourceId : name;
 
       const sourceGate = dInputSourceId ? model.gates.find((gate) => gate.id === dInputSourceId) : null;
-      const sourceHeight = sourceGate ? (GATE_HEIGHTS[sourceGate.type] || 50) : 50;
+      const sourceHeight = sourceGate ? (getGateHeight(sourceGate)) : 50;
       const dffY = sourceGate
         ? sourceGate.y + sourceHeight / 2
         : 95 + (parsed.inputs.length + index) * 72;
@@ -90,7 +90,7 @@ function buildCircuitModel(parsed) {
         type: "D_FLIP_FLOP",
         label: `${name} -> ${qOutput}`,
         x: dffX,
-        y: dffY - (GATE_HEIGHTS.D_FLIP_FLOP / 2),
+        y: dffY - (GATE_BASE_HEIGHTS.D_FLIP_FLOP / 2),
         inputs: [dInputSignal, "CLK"],
         output: qOutput
       });
@@ -140,9 +140,37 @@ function isFlipFlopInputOutput(parsed, output) {
   );
 }
 
-// Gate height by type (matches normalizeNode sizes in circuitDiagramService).
-const GATE_HEIGHTS = { NOT: 42, AND: 50, OR: 52, XOR: 52, NAND: 50, NOR: 52, XNOR: 52, OUTPUT: 32, D_FLIP_FLOP: 62 };
-const GATE_WIDTHS = { NOT: 58, AND: 76, OR: 82, XOR: 88, NAND: 86, NOR: 92, XNOR: 98, OUTPUT: 76, D_FLIP_FLOP: 104 };
+// Base gate heights — multi-input gates (AND/OR/XOR/NAND/NOR/XNOR) scale by 16px per input > 2.
+const GATE_BASE_HEIGHTS = { NOT: 42, AND: 50, OR: 52, XOR: 52, NAND: 50, NOR: 52, XNOR: 52, OUTPUT: 32, D_FLIP_FLOP: 62 };
+const GATE_WIDTHS      = { NOT: 58, AND: 76, OR: 82, XOR: 88, NAND: 86, NOR: 92, XNOR: 98, OUTPUT: 76, D_FLIP_FLOP: 104 };
+const SCALABLE_TYPES   = new Set(["AND", "OR", "XOR", "NAND", "NOR", "XNOR"]);
+
+function getGateHeight(gate) {
+  const base = GATE_BASE_HEIGHTS[gate.type] || 50;
+  const n = (gate.inputs || []).length;
+  return (SCALABLE_TYPES.has(gate.type) && n > 2) ? base + (n - 2) * 16 : base;
+}
+
+// Recursively collect all leaves of a left/right-associative chain of the same type.
+// e.g. flattenBinaryChain(OR(OR(a,b),c), "OR") → [a, b, c]
+function flattenBinaryChain(ast, type) {
+  if (ast.type !== type) return [ast];
+  return [...flattenBinaryChain(ast.left, type), ...flattenBinaryChain(ast.right, type)];
+}
+
+// Re-compute layout depth and centre-Y for a leaf AST node, independent of the
+// layout positions map (which only tracks non-VAR nodes).
+function getAstMeasure(ast, inputY) {
+  if (ast.type === "VAR")   return { depth: 0, y: inputY.get(ast.name) || 120 };
+  if (ast.type === "CONST") return { depth: 0, y: 95 };
+  if (ast.type === "NOT") {
+    const child = getAstMeasure(ast.value, inputY);
+    return { depth: child.depth + 1, y: child.y };
+  }
+  const left  = getAstMeasure(ast.left,  inputY);
+  const right = getAstMeasure(ast.right, inputY);
+  return { depth: Math.max(left.depth, right.depth) + 1, y: (left.y + right.y) / 2 };
+}
 
 function deconflictGlobalPositions(gates) {
   const GAP = 14; // minimum vertical gap between adjacent gates in same column
@@ -158,7 +186,7 @@ function deconflictGlobalPositions(gates) {
     colGates.sort((a, b) => a.y - b.y);
     for (let i = 1; i < colGates.length; i++) {
       const prev = colGates[i - 1];
-      const prevBottom = prev.y + (GATE_HEIGHTS[prev.type] || 50);
+      const prevBottom = prev.y + (getGateHeight(prev));
       const needed = prevBottom + GAP;
       if (colGates[i].y < needed) {
         colGates[i].y = needed;
@@ -185,9 +213,9 @@ function alignOutputPinsToFinalSources(model) {
 
   entriesBySource.forEach((entries, sourceId) => {
     const sourceGate = gatesById.get(sourceId);
-    const sourceHeight = GATE_HEIGHTS[sourceGate.type] || 50;
+    const sourceHeight = getGateHeight(sourceGate);
     const sourceWidth = GATE_WIDTHS[sourceGate.type] || 104;
-    const outputHeight = GATE_HEIGHTS.OUTPUT;
+    const outputHeight = GATE_BASE_HEIGHTS.OUTPUT;
     const sourceCenterY = sourceGate.y + sourceHeight / 2;
     const gap = 44;
     const hasStateOutputs = entries.some((entry) => /^D\d+$/i.test(entry.outputGate.label || ""));
@@ -245,8 +273,8 @@ function alignFlipFlopsToFinalSources(model) {
       const dWire = model.wires.find((wire) => wire.to === flipFlop.id && wire.signal === dSignal);
       const sourceGate = dWire ? gatesById.get(dWire.from) : null;
       if (sourceGate) {
-        const sourceHeight = GATE_HEIGHTS[sourceGate.type] || 50;
-        flipFlop.y = sourceGate.y + sourceHeight / 2 - GATE_HEIGHTS.D_FLIP_FLOP / 2;
+        const sourceHeight = getGateHeight(sourceGate);
+        flipFlop.y = sourceGate.y + sourceHeight / 2 - GATE_BASE_HEIGHTS.D_FLIP_FLOP / 2;
       }
       flipFlop.x = Math.max(flipFlop.x, flipFlopX);
     });
@@ -286,29 +314,21 @@ function buildAstGates(ast, model, context, layout) {
   }
 
   if (ast.type === "NOT") {
-    // Collapse NOT(AND) → NAND, NOT(OR) → NOR, NOT(XOR) → XNOR into single compound gates.
-    // Use the inner gate's layout position so the compound gate sits at the same depth
-    // as the suppressed AND/OR/XOR would have — saving one pipeline stage visually.
+    // Collapse NOT(AND) → NAND, NOT(OR) → NOR, NOT(XOR) → XNOR.
+    // Also flatten inner chains: NOT(AND(AND(a,b),c)) → 3-input NAND.
     const inner = ast.value;
     if (inner.type === "AND" || inner.type === "OR" || inner.type === "XOR") {
       const compoundType = inner.type === "AND" ? "NAND" : inner.type === "OR" ? "NOR" : "XNOR";
-      const left = buildAstGates(inner.left, model, context, layout);
-      const right = buildAstGates(inner.right, model, context, layout);
+      const leaves = flattenBinaryChain(inner, inner.type);
+      const allInputs = leaves.map((leaf) => buildAstGates(leaf, model, context, layout));
       const id = `${compoundType.toLowerCase()}_${++counters[compoundType]}`;
       const signal = `${compoundType.toLowerCase()}_${counters[compoundType]}_out`;
-      // Use the inner (AND/OR/XOR) node's position; fall back to the NOT node's position.
-      const point = layout.positions.get(inner) || layout.positions.get(ast);
+      const { x, y } = gatePosition(leaves, compoundType, layout, inputY);
       model.gates.push({
-        id,
-        type: compoundType,
-        label: astToText(ast),
-        x: point ? point.x : 150,
-        y: point ? point.y - 25 : 95,
-        inputs: [left.signal, right.signal],
-        output: signal
+        id, type: compoundType, label: astToText(ast),
+        x, y, inputs: allInputs.map((i) => i.signal), output: signal
       });
-      model.wires.push({ from: left.sourceId, to: id, signal: left.signal });
-      model.wires.push({ from: right.sourceId, to: id, signal: right.signal });
+      allInputs.forEach((inp) => model.wires.push({ from: inp.sourceId, to: id, signal: inp.signal }));
       const result = { signal, sourceId: id };
       gateCache.set(cacheKey, result);
       return result;
@@ -323,13 +343,9 @@ function buildAstGates(ast, model, context, layout) {
         ? inputY.get(ast.value.name)
         : (point ? point.y : 95);
     model.gates.push({
-      id,
-      type: "NOT",
-      label: astToText(ast),
-      x: point ? point.x : 150,
-      y: alignedY - 21,
-      inputs: [input.signal],
-      output: signal
+      id, type: "NOT", label: astToText(ast),
+      x: point ? point.x : 150, y: alignedY - 21,
+      inputs: [input.signal], output: signal
     });
     model.wires.push({ from: input.sourceId, to: id, signal: input.signal });
     const result = { signal, sourceId: id };
@@ -337,25 +353,42 @@ function buildAstGates(ast, model, context, layout) {
     return result;
   }
 
-  const left = buildAstGates(ast.left, model, context, layout);
-  const right = buildAstGates(ast.right, model, context, layout);
+  // Flatten associative chains: OR(OR(a,b),c) → single 3-input OR gate, etc.
+  const leaves = flattenBinaryChain(ast, ast.type);
+  const allInputs = leaves.map((leaf) => buildAstGates(leaf, model, context, layout));
   const id = `${ast.type.toLowerCase()}_${++counters[ast.type]}`;
   const signal = `${ast.type.toLowerCase()}_${counters[ast.type]}_out`;
-  const point = layout.positions.get(ast);
+  const { x, y } = gatePosition(leaves, ast.type, layout, inputY);
   model.gates.push({
-    id,
-    type: ast.type,
-    label: astToText(ast),
-    x: point ? point.x : 150,
-    y: point ? point.y - 25 : 95,
-    inputs: [left.signal, right.signal],
-    output: signal
+    id, type: ast.type, label: astToText(ast),
+    x, y, inputs: allInputs.map((i) => i.signal), output: signal
   });
-  model.wires.push({ from: left.sourceId, to: id, signal: left.signal });
-  model.wires.push({ from: right.sourceId, to: id, signal: right.signal });
+  allInputs.forEach((inp) => model.wires.push({ from: inp.sourceId, to: id, signal: inp.signal }));
   const result = { signal, sourceId: id };
   gateCache.set(cacheKey, result);
   return result;
+}
+
+// Compute x/y position for a gate given its flattened leaf nodes.
+// Uses the max-depth of any leaf + 1 column, centred on the average leaf Y.
+function gatePosition(leaves, type, layout, inputY) {
+  if (leaves.length === 2) {
+    // For binary gates keep using the pre-computed layout position when available.
+    const pos = layout.positions.get(leaves[0]) || layout.positions.get(leaves[1]);
+    // Prefer the outer gate's position if the leaves are themselves AST nodes:
+    // fall through to depth-based calculation if leaves are VARs (no position entry).
+    if (pos) {
+      const baseH = GATE_BASE_HEIGHTS[type] || 50;
+      return { x: pos.x + 118, y: pos.y - baseH / 2 };
+    }
+  }
+  const measures = leaves.map((leaf) => getAstMeasure(leaf, inputY));
+  const maxDepth = Math.max(0, ...measures.map((m) => m.depth));
+  const avgY = measures.reduce((s, m) => s + m.y, 0) / measures.length;
+  const n = leaves.length;
+  const baseH = GATE_BASE_HEIGHTS[type] || 50;
+  const h = (SCALABLE_TYPES.has(type) && n > 2) ? baseH + (n - 2) * 16 : baseH;
+  return { x: 150 + (maxDepth + 1) * 118, y: avgY - h / 2 };
 }
 
 function layoutAst(ast, outputIndex, inputY, outputCount) {
