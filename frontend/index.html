@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Logic Diagram AI</title>
-    <link rel="stylesheet" href="styles.css?v=20260507-15" />
+    <link rel="stylesheet" href="styles.css?v=20260507-16" />
   </head>
   <body>
     <!-- Animated background orbs -->
@@ -35,6 +35,7 @@
           </div>
         </div>
         <textarea id="question" spellcheck="false" placeholder="e.g. 'create a half adder'  ·  'F = A&apos;B + AB&apos;'  ·  paste VHDL...">F = A'B' + B'C'</textarea>
+        <div id="charHint" class="char-hint"></div>
         <div class="input-footer">
           <div class="upload-row">
             <label class="file-label" for="imageInput">
@@ -44,12 +45,15 @@
             <input id="imageInput" type="file" accept="image/png,image/jpeg,image/webp,image/gif" />
             <span id="imageName" class="image-name">No image selected</span>
           </div>
-          <button id="analyzeBtn" type="button" class="primary">
-            <span class="btn-text">Generate Circuit</span>
-            <span class="btn-loader" hidden>
-              <span class="dot"></span><span class="dot"></span><span class="dot"></span>
-            </span>
-          </button>
+          <div class="btn-group">
+            <button id="analyzeBtn" type="button" class="primary">
+              <span class="btn-text">Generate Circuit</span>
+              <span class="btn-loader" hidden>
+                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+              </span>
+            </button>
+            <span class="kbd-hint"><kbd>⌘</kbd><kbd>↵</kbd></span>
+          </div>
         </div>
       </section>
 
@@ -74,7 +78,17 @@
       </section>
     </main>
 
+    <footer class="site-footer">
+      <div class="footer-inner">
+        <span class="footer-logo">Logic Diagram <span class="title-accent">AI</span></span>
+        <span class="footer-sep">·</span>
+        <span class="footer-note">Describe a circuit, get an instant diagram, truth table &amp; simulator</span>
+        <span class="footer-sep">·</span>
+        <a class="footer-link" href="https://github.com/PhyoThihaOo32/LogicDiagramAI" target="_blank" rel="noopener">GitHub ↗</a>
+      </div>
+    </footer>
+
     <iframe id="downloadFrame" name="downloadFrame" hidden></iframe>
-    <script src="app.js?v=20260507-15"></script>
+    <script src="app.js?v=20260507-16"></script>
   </body>
 </html>

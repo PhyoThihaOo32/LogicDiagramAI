@@ -16,6 +16,7 @@ const imageName = document.querySelector("#imageName");
 const analyzeBtn = document.querySelector("#analyzeBtn");
 const statusBox = document.querySelector("#status");
 const results = document.querySelector("#results");
+const charHint = document.querySelector("#charHint");
 document.querySelectorAll(".tabs button").forEach((button) => {
   button.addEventListener("click", () => activateTab(button.dataset.tab));
 });
@@ -30,8 +31,38 @@ document.querySelectorAll(".chip[data-fill]").forEach((chip) => {
   chip.addEventListener("click", () => {
     question.value = chip.dataset.fill;
     question.focus();
+    updateCharHint();
   });
 });
+
+// Keyboard shortcut: Ctrl/Cmd + Enter to generate
+document.addEventListener("keydown", (e) => {
+  const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+  if ((isMac ? e.metaKey : e.ctrlKey) && e.key === "Enter") {
+    e.preventDefault();
+    if (!analyzeBtn.disabled) analyze();
+  }
+});
+
+// Show ⌘↵ on Mac, Ctrl↵ on other OS
+(function setKbdHint() {
+  const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform || navigator.userAgent);
+  const hint = document.querySelector(".kbd-hint");
+  if (hint && !isMac) {
+    hint.innerHTML = "<kbd>Ctrl</kbd><kbd>↵</kbd>";
+  }
+})();
+
+// Char counter under textarea
+function updateCharHint() {
+  if (!charHint) return;
+  const len = question.value.length;
+  if (len === 0) { charHint.textContent = ""; return; }
+  charHint.textContent = `${len} char${len !== 1 ? "s" : ""}`;
+  charHint.classList.toggle("warn", len > 800);
+}
+question.addEventListener("input", updateCharHint);
+updateCharHint();
 
 if (window.location.protocol === "file:") {
   setStatus("Running from a local file. The app will use the backend at http://127.0.0.1:3000; for the most reliable experience, open that URL directly.");
@@ -60,10 +91,13 @@ async function analyze(event) {
     state.analysis = data;
     if (data.imageExtraction && data.imageExtraction.question) {
       question.value = data.imageExtraction.question;
+      updateCharHint();
     }
     renderResults(data);
     setStatus("");
     results.hidden = false;
+    // Smooth scroll to results
+    window.setTimeout(() => results.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
   } catch (error) {
     setStatus(error.message, true);
   } finally {
