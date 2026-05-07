@@ -39,12 +39,8 @@ if (window.location.protocol === "file:") {
 
 function setAnalyzeLoading(loading) {
   analyzeBtn.disabled = loading;
-  const icon = analyzeBtn.querySelector(".btn-icon");
-  const text = analyzeBtn.querySelector(".btn-text");
-  const loader = analyzeBtn.querySelector(".btn-loader");
-  if (icon) icon.hidden = loading;
-  if (text) text.hidden = loading;
-  if (loader) loader.hidden = !loading;
+  analyzeBtn.querySelector(".btn-text").hidden = loading;
+  analyzeBtn.querySelector(".btn-loader").hidden = !loading;
 }
 
 async function analyze(event) {
