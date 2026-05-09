@@ -48,18 +48,29 @@ function generateDiagramSvg(circuitModel) {
     }
   });
 
+  const allNodes = [...inputNodes, ...gates.map(normalizeNode)];
+
   const wires = (circuitModel.wires || [])
     .map((wire) => drawWire(wire, nodeMap, signalSourceY))
     .join("\n");
-  const nodes = [...inputNodes, ...gates.map(normalizeNode)].map((n) => drawNode(n, signalSourceY)).join("\n");
+  const nodes = allNodes.map((n) => drawNode(n, signalSourceY)).join("\n");
+  const junctions = buildJunctionDots(circuitModel.wires || [], nodeMap);
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="Generated circuit diagram">
-<defs/>
+<defs>
+  <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+    <feGaussianBlur stdDeviation="2.5" result="blur"/>
+    <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+  </filter>
+</defs>
 <rect width="100%" height="100%" fill="#0a0a0a"/>
-<text x="24" y="28" font-family="Arial" font-size="16" font-weight="700" fill="#f0628a" letter-spacing="2">${escapeXml(circuitModel.projectName || "AI Generated Circuit")}</text>
-<text x="24" y="48" font-family="Arial" font-size="11" fill="#666666">${escapeXml(buildSubtitle(circuitModel))}</text>
+<rect x="0" y="0" width="${width}" height="56" fill="rgba(240,98,138,0.05)"/>
+<line x1="0" y1="56" x2="${width}" y2="56" stroke="rgba(240,98,138,0.18)" stroke-width="1"/>
+<text x="18" y="26" font-family="Arial" font-size="15" font-weight="800" fill="#f0628a" letter-spacing="1" filter="url(#glow)">${escapeXml(circuitModel.projectName || "AI Generated Circuit")}</text>
+<text x="18" y="44" font-family="Arial" font-size="10" fill="#606070">${escapeXml(buildSubtitle(circuitModel))}</text>
 ${wires}
 ${nodes}
+${junctions}
 </svg>`;
 }
 
@@ -155,9 +166,11 @@ function inputAnchor(node, signal, signalSourceY) {
 function drawNode(node, signalSourceY) {
   switch (node.type) {
     case "INPUT":
-      return drawPin(node, "#1e0710", "#f0628a");
+      // Green arrow pin pointing right — signal source
+      return drawInputPin(node);
     case "OUTPUT":
-      return drawPin(node, "#2a0f1a", "#f0628a");
+      // Cyan notched pin — signal sink
+      return drawOutputPin(node);
     case "NOT":
       return drawNotGate(node);
     case "AND":
@@ -175,21 +188,67 @@ function drawNode(node, signalSourceY) {
     case "D_FLIP_FLOP":
       return drawFlipFlop(node);
     case "CONST":
-      return drawPin(node, "#1a1a1a", "#808080");
+      return drawConstPin(node);
     default:
-      return drawPin(node, "#1e0710", "#f0628a");
+      return drawInputPin(node);
   }
 }
 
-function drawPin(node, fill, stroke) {
-  const x = node.x;
-  const y = node.y;
-  const w = node.width;
-  const h = node.height;
+// ── INPUT pin — pentagon arrow pointing right (green) ─────────────────────────
+function drawInputPin(node) {
+  const { x, y, width: w, height: h } = node;
+  const tip = Math.min(11, h / 2 - 1);
+  const label = escapeXml(node.label || node.id);
   return `<g>
-  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="7" fill="${fill}" stroke="${stroke}" stroke-width="1.5"/>
-  <text x="${x + w / 2}" y="${y + h / 2 + 5}" text-anchor="middle" font-family="Arial" font-size="12" font-weight="700" fill="#f0f0f0">${escapeXml(node.label || node.id)}</text>
+  <path d="M ${x} ${y} L ${x+w-tip} ${y} L ${x+w} ${y+h/2} L ${x+w-tip} ${y+h} L ${x} ${y+h} Z"
+        fill="#0d1f14" stroke="#10b981" stroke-width="1.6"/>
+  <text x="${x+(w-tip)/2}" y="${y+h/2+4}" text-anchor="middle"
+        font-family="Arial" font-size="11" font-weight="700" fill="#6ee7b7">${label}</text>
 </g>`;
+}
+
+// ── OUTPUT pin — notched pentagon receiving from left (cyan) ──────────────────
+function drawOutputPin(node) {
+  const { x, y, width: w, height: h } = node;
+  const notch = Math.min(11, h / 2 - 1);
+  const label = escapeXml(node.label || node.id);
+  return `<g>
+  <path d="M ${x+notch} ${y} L ${x+w} ${y} L ${x+w} ${y+h} L ${x+notch} ${y+h} L ${x} ${y+h/2} Z"
+        fill="#0d1825" stroke="#22d3ee" stroke-width="1.6"/>
+  <text x="${x+notch+(w-notch)/2}" y="${y+h/2+4}" text-anchor="middle"
+        font-family="Arial" font-size="11" font-weight="700" fill="#67e8f9">${label}</text>
+</g>`;
+}
+
+// ── CONST pin — small grey rectangle ─────────────────────────────────────────
+function drawConstPin(node) {
+  const { x, y, width: w, height: h } = node;
+  return `<g>
+  <rect x="${x}" y="${y}" width="${w}" height="${h}" rx="5"
+        fill="#141414" stroke="#555" stroke-width="1.2"/>
+  <text x="${x+w/2}" y="${y+h/2+4}" text-anchor="middle"
+        font-family="Arial" font-size="12" font-weight="700" fill="#aaa">${escapeXml(node.label || node.id)}</text>
+</g>`;
+}
+
+// ── Junction dots ─────────────────────────────────────────────────────────────
+// Draws a filled dot wherever a signal fans out to 2+ targets.
+function buildJunctionDots(wires, nodeMap) {
+  const count = new Map();
+  wires.forEach((w) => count.set(w.from, (count.get(w.from) || 0) + 1));
+  const seen = new Set();
+  const dots = [];
+  wires.forEach((w) => {
+    if ((count.get(w.from) || 0) < 2) return;
+    const src = nodeMap.get(w.from);
+    if (!src) return;
+    const a = outputAnchor(src);
+    const key = `${a.x},${a.y}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    dots.push(`<circle cx="${a.x}" cy="${a.y}" r="3.5" fill="#f0628a"/>`);
+  });
+  return dots.join("\n");
 }
 
 function drawNotGate(node) {
@@ -341,9 +400,11 @@ function cleanSignal(signal) {
 }
 
 function buildSubtitle(circuitModel) {
-  const inputs = (circuitModel.inputs || []).join(", ");
-  const outputs = (circuitModel.outputs || []).join(", ");
-  return `Inputs: ${inputs || "none"}   Outputs: ${outputs || "none"}`;
+  const inputs  = (circuitModel.inputs  || []).join(", ") || "none";
+  const outputs = (circuitModel.outputs || []).join(", ") || "none";
+  const gateCount = (circuitModel.gates || []).filter((g) => !["OUTPUT", "CONST"].includes(g.type)).length;
+  const typeLabel = circuitModel.type === "sequential" ? "Sequential" : "Combinational";
+  return `${typeLabel}  ·  Inputs: ${inputs}  ·  Outputs: ${outputs}  ·  ${gateCount} gate${gateCount !== 1 ? "s" : ""}`;
 }
 
 module.exports = { generateDiagramSvg };

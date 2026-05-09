@@ -173,7 +173,7 @@ function getAstMeasure(ast, inputY) {
 }
 
 function deconflictGlobalPositions(gates) {
-  const GAP = 14; // minimum vertical gap between adjacent gates in same column
+  const GAP = 20; // minimum vertical gap between adjacent gates in same column
   // Group gates by their x position (exact match, since x values are multiples of 118).
   const columns = new Map();
   gates.forEach((gate) => {
@@ -446,7 +446,7 @@ function layoutAst(ast, outputIndex, inputY, outputCount) {
 }
 
 function resolveColumnCollisions(positions) {
-  const minGap = 72;
+  const minGap = 78;
   const columns = new Map();
   positions.forEach((point) => {
     if (!columns.has(point.x)) columns.set(point.x, []);

@@ -23,6 +23,21 @@ function extractClaudeText(message) {
     .trim();
 }
 
+// Robustly extract JSON from Claude output even when it wraps in ```json … ``` blocks.
+function extractJson(text) {
+  const s = text.trim();
+  // 1. Direct parse
+  try { return JSON.parse(s); } catch (_) {}
+  // 2. Markdown code block
+  const block = s.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (block) { try { return JSON.parse(block[1].trim()); } catch (_) {} }
+  // 3. First { ... } in text
+  const start = s.indexOf("{");
+  const end   = s.lastIndexOf("}");
+  if (start !== -1 && end > start) { try { return JSON.parse(s.slice(start, end + 1)); } catch (_) {} }
+  throw new Error("Could not extract JSON from AI response: " + s.slice(0, 200));
+}
+
 function coerceParsedCircuit(parsed, fallbackQuestion) {
   if (!parsed.inputs || !parsed.outputs || !parsed.expressions) {
     return parseLogicQuestion(fallbackQuestion);
@@ -41,35 +56,67 @@ function coerceParsedCircuit(parsed, fallbackQuestion) {
   };
 }
 
-const CIRCUIT_EXTRACTION_PROMPT = `You are a digital logic circuit designer.
-The user may describe a circuit in natural language ("create a half adder", "make a 3-input AND gate", "build a full adder"), provide Boolean expressions directly ("F = A + B"), provide VHDL source code, ask for a standard sequential circuit, or upload/read a truth table/state table/circuit diagram.
-When given VHDL: parse the entity port declarations for input/output names, read the concurrent signal assignments (output <= expression), and convert VHDL operators (and→AND, or→OR, not→NOT, xor→XOR, nand→NOT(A AND B), nor→NOT(A OR B), xnor→NOT(A XOR B)) to produce correct Boolean expressions.
-Extract or derive the circuit and return strict JSON only with keys:
-type, subtype, inputs, outputs, expressions, flipFlops, stateVariables, stateDiagram, explanation, notes.
-Use AND/OR/NOT/XOR operators in expressions.
-For sequential circuits, return next-state D equations as outputs D0, D1, etc. Include stateVariables such as Q0 and Q1, and include flipFlops for each D output.
-If the request asks to derive an expression from a circuit image, infer the gates and return the final Boolean expression.
-If the request needs missing data (for example "given a truth table" without the truth table, "given a state table" without the table, or waveform analysis without a waveform/input sequence), explain the missing data in notes and still return the closest standard circuit only when one is clearly specified.
-Do not include markdown.
+const CIRCUIT_EXTRACTION_PROMPT = `You are a digital logic circuit designer and Boolean algebra expert.
 
-Common circuits to recognise:
-- Half adder: Sum=A XOR B, Carry=A AND B
-- Half subtractor: Difference=A XOR B, Borrow=NOT A AND B
-- Full adder: Sum=A XOR B XOR Cin, Cout=(A AND B) OR (Cin AND (A XOR B))
-- 2-to-4 decoder with inputs A,B and outputs D0-D3: D0=NOT A AND NOT B, D1=NOT A AND B, D2=A AND NOT B, D3=A AND B
-- AND gate (N inputs): F=A AND B [AND C...]
-- OR gate (N inputs): F=A OR B [OR C...]
+INPUT FORMATS YOU ACCEPT:
+- Natural language: "create a half adder", "make a 3-input AND gate", "4-to-1 multiplexer"
+- Boolean expressions: "F = A'B + AB'", "Sum = A XOR B XOR Cin"
+- VHDL source code: parse entity ports and concurrent signal assignments
+- Truth tables / state tables: derive the minimal SOP expression for each output
+- Circuit images: identify gates, inputs, outputs, derive Boolean expressions
+
+VHDL conversion rules: and→AND, or→OR, not→NOT, xor→XOR, nand→NOT(... AND ...), nor→NOT(... OR ...), xnor→NOT(... XOR ...)
+
+OUTPUT: Return strict JSON only — no markdown, no code fences, no extra text.
+Required keys: type, subtype, inputs, outputs, expressions, flipFlops, stateVariables, stateDiagram, explanation, notes
+
+EXPRESSION RULES (critical):
+- Use ONLY AND / OR / NOT / XOR in expressions — never write NAND, NOR, XNOR as operators
+- For NAND: write NOT(A AND B)
+- For NOR:  write NOT(A OR B)
+- For XNOR: write NOT(A XOR B)
+- Parenthesise compound subexpressions clearly
+- Variables are case-sensitive single letters or short names (A, B, Cin, Q0, SI)
+
+SEQUENTIAL CIRCUITS:
+- type="sequential", outputs are D flip-flop next-state equations named D0, D1, …
+- Include stateVariables (Q0, Q1, …) in inputs
+- Include flipFlops array listing each D-output name
+- Add stateDiagram string showing state sequence
+
+MISSING DATA:
+- If user says "given a truth table" without providing one, explain in notes and return the closest named circuit
+
+COMMON CIRCUITS (memorise these exactly):
+Combinational:
+- Half adder: inputs=[A,B] Sum=A XOR B, Carry=A AND B
+- Half subtractor: inputs=[A,B] Difference=A XOR B, Borrow=NOT A AND B
+- Full adder: inputs=[A,B,Cin] Sum=A XOR B XOR Cin, Cout=(A AND B) OR (Cin AND (A XOR B))
+- Full subtractor: inputs=[A,B,Bin] Diff=A XOR B XOR Bin, Bout=((NOT A) AND B) OR ((NOT A) AND Bin) OR (B AND Bin)
+- 2-to-4 decoder: inputs=[A,B] D0=NOT A AND NOT B, D1=NOT A AND B, D2=A AND NOT B, D3=A AND B
+- 3-to-8 decoder: inputs=[A,B,C] D0=NOT A AND NOT B AND NOT C, … D7=A AND B AND C
+- AND gate N-input: F=A AND B [AND C AND D …]
+- OR gate N-input: F=A OR B [OR C …]
 - NAND gate: F=NOT(A AND B)
 - NOR gate: F=NOT(A OR B)
 - XNOR gate: F=NOT(A XOR B)
 - Majority gate (3-input): F=(A AND B) OR (B AND C) OR (A AND C)
-- 2:1 Multiplexer: F=(S AND B) OR (NOT S AND A)
-- D latch: treat as combinational with Q=D output
-- 2-bit synchronous up counter with D flip-flops: D0=NOT Q0, D1=Q1 XOR Q0
-- 2-bit synchronous down counter with D flip-flops: D0=NOT Q0, D1=Q1 XOR NOT Q0
-- Mealy 101 detector with overlap: D1=Q0 AND NOT X, D0=X, Z=Q1 AND NOT Q0 AND X
-- SISO 4-bit shift register: D0=SI, D1=Q0, D2=Q1, D3=Q2
-- 4-bit parallel-load register: each Di=(L AND Pi) OR (NOT L AND Qi)`;
+- 2:1 Mux: inputs=[A,B,S] F=(NOT S AND A) OR (S AND B)
+- 4:1 Mux: inputs=[D0,D1,D2,D3,S0,S1] F=(NOT S1 AND NOT S0 AND D0) OR (NOT S1 AND S0 AND D1) OR (S1 AND NOT S0 AND D2) OR (S1 AND S0 AND D3)
+- 1-bit comparator: inputs=[A,B] EQ=NOT(A XOR B), GT=A AND NOT B, LT=NOT A AND B
+- Even parity (3-input): inputs=[A,B,C] P=A XOR B XOR C
+- Odd parity (3-input): inputs=[A,B,C] P=NOT(A XOR B XOR C)
+- SR latch (NOR): inputs=[S,R] Q=NOT(R OR NOT Q_prev) — model as combinational Q=S AND NOT R
+- D latch: inputs=[D,E] Q=D (treat as pass-through; E is enable, model Q=D for simplicity)
+Sequential:
+- 2-bit synchronous up counter: inputs=[Q0,Q1] D0=NOT Q0, D1=Q1 XOR Q0, stateDiagram=00->01->10->11->00
+- 2-bit synchronous down counter: inputs=[Q0,Q1] D0=NOT Q0, D1=Q1 XOR NOT Q0, stateDiagram=00->11->10->01->00
+- 3-bit up counter: inputs=[Q0,Q1,Q2] D0=NOT Q0, D1=Q1 XOR Q0, D2=Q2 XOR (Q1 AND Q0)
+- Mealy 101 detector (overlap): inputs=[Q1,Q0,X] D1=Q0 AND NOT X, D0=X, Z=Q1 AND NOT Q0 AND X
+- Mealy 1101 detector (overlap): as previously defined
+- SISO 4-bit shift register: inputs=[SI,Q0,Q1,Q2] D0=SI, D1=Q0, D2=Q1, D3=Q2
+- 4-bit parallel-load register: each Di=(L AND Pi) OR (NOT L AND Qi)
+- JK toggle counter (2-bit): J0=1, K0=1, J1=Q0, K1=Q0`;
 
 const NAMED_CIRCUITS = [
   {
@@ -245,6 +292,99 @@ const NAMED_CIRCUITS = [
     }
   },
   {
+    pattern: /full.?subtractor/i,
+    result: {
+      type: "combinational", subtype: "full-subtractor",
+      inputs: ["A", "B", "Bin"], outputs: ["Diff", "Bout"],
+      expressions: {
+        Diff: "A XOR B XOR Bin",
+        Bout: "((NOT A) AND B) OR ((NOT A) AND Bin) OR (B AND Bin)"
+      },
+      flipFlops: [], stateVariables: [],
+      explanation: "Full subtractor: Diff is A XOR B XOR Bin, Borrow-out uses AND-OR logic on complemented A."
+    }
+  },
+  {
+    pattern: /4.?(?:to|:).?1\s*(?:mux|multiplexer)|4.?input.*mux/i,
+    result: {
+      type: "combinational", subtype: "4-to-1-mux",
+      inputs: ["D0", "D1", "D2", "D3", "S0", "S1"], outputs: ["F"],
+      expressions: {
+        F: "(NOT S1 AND NOT S0 AND D0) OR (NOT S1 AND S0 AND D1) OR (S1 AND NOT S0 AND D2) OR (S1 AND S0 AND D3)"
+      },
+      flipFlops: [], stateVariables: [],
+      explanation: "4-to-1 multiplexer: S1,S0 select one of four data inputs D0-D3."
+    }
+  },
+  {
+    pattern: /1.?bit\s+comparator|single.?bit\s+comparator|magnitude comparator/i,
+    result: {
+      type: "combinational", subtype: "1-bit-comparator",
+      inputs: ["A", "B"], outputs: ["EQ", "GT", "LT"],
+      expressions: {
+        EQ: "NOT (A XOR B)",
+        GT: "A AND NOT B",
+        LT: "NOT A AND B"
+      },
+      flipFlops: [], stateVariables: [],
+      explanation: "1-bit magnitude comparator: EQ when A equals B, GT when A>B, LT when A<B."
+    }
+  },
+  {
+    pattern: /even\s+parity|parity\s+generator|parity\s+checker/i,
+    result: {
+      type: "combinational", subtype: "even-parity",
+      inputs: ["A", "B", "C"], outputs: ["P"],
+      expressions: { P: "A XOR B XOR C" },
+      flipFlops: [], stateVariables: [],
+      explanation: "3-input even parity generator: output P makes the total number of 1s even."
+    }
+  },
+  {
+    pattern: /odd\s+parity/i,
+    result: {
+      type: "combinational", subtype: "odd-parity",
+      inputs: ["A", "B", "C"], outputs: ["P"],
+      expressions: { P: "NOT (A XOR B XOR C)" },
+      flipFlops: [], stateVariables: [],
+      explanation: "3-input odd parity generator: output P makes the total number of 1s odd."
+    }
+  },
+  {
+    pattern: /3.?to.?8\s*decoder|3.?bit.*decoder|eight.?output.*decoder/i,
+    result: {
+      type: "combinational", subtype: "3-to-8-decoder",
+      inputs: ["A", "B", "C"], outputs: ["D0","D1","D2","D3","D4","D5","D6","D7"],
+      expressions: {
+        D0: "NOT A AND NOT B AND NOT C",
+        D1: "NOT A AND NOT B AND C",
+        D2: "NOT A AND B AND NOT C",
+        D3: "NOT A AND B AND C",
+        D4: "A AND NOT B AND NOT C",
+        D5: "A AND NOT B AND C",
+        D6: "A AND B AND NOT C",
+        D7: "A AND B AND C"
+      },
+      flipFlops: [], stateVariables: [],
+      explanation: "3-to-8 decoder: each of the 8 outputs is a unique minterm of A, B, C."
+    }
+  },
+  {
+    pattern: /3.?bit.*(?:synchronous\s+)?up.*counter|3.?bit.*counter/i,
+    result: {
+      type: "sequential", subtype: "3-bit-up-counter",
+      inputs: ["Q0", "Q1", "Q2"], outputs: ["D0", "D1", "D2"],
+      expressions: {
+        D0: "NOT Q0",
+        D1: "Q1 XOR Q0",
+        D2: "Q2 XOR (Q1 AND Q0)"
+      },
+      flipFlops: ["D0", "D1", "D2"], stateVariables: ["Q0", "Q1", "Q2"],
+      stateDiagram: "000 -> 001 -> 010 -> 011 -> 100 -> 101 -> 110 -> 111 -> 000",
+      explanation: "3-bit synchronous up counter. D0 toggles every clock; D1 toggles when Q0=1; D2 toggles when Q1 and Q0 are both 1."
+    }
+  },
+  {
     pattern: /jk.*toggle.*counter|toggle counter.*jk/i,
     result: {
       type: "sequential", subtype: "jk-toggle-counter",
@@ -306,11 +446,12 @@ async function analyzeQuestion(question) {
       const client = createClaudeClient();
       const message = await client.messages.create({
         model: claudeModel(),
-        max_tokens: 1200,
-        system: CIRCUIT_EXTRACTION_PROMPT,
+        max_tokens: 1400,
+        // Cache the large system prompt so repeated requests don't re-tokenise it.
+        system: [{ type: "text", text: CIRCUIT_EXTRACTION_PROMPT, cache_control: { type: "ephemeral" } }],
         messages: [{ role: "user", content: question }]
       });
-      return coerceParsedCircuit(JSON.parse(extractClaudeText(message)), question);
+      return coerceParsedCircuit(extractJson(extractClaudeText(message)), question);
     } catch (error) {
       console.warn("Claude analysis failed; using fallback parser.", error.message);
     }
@@ -332,7 +473,7 @@ async function analyzeQuestion(question) {
         { role: "user", content: question }
       ]
     });
-    return coerceParsedCircuit(JSON.parse(completion.choices[0].message.content), question);
+    return coerceParsedCircuit(extractJson(completion.choices[0].message.content), question);
   } catch (error) {
     console.warn("OpenAI analysis failed; using local parser.", error.message);
     return parseLogicQuestion(question);
@@ -340,7 +481,13 @@ async function analyzeQuestion(question) {
 }
 
 function looksLikeEquationInput(question) {
-  return /(^|\n)\s*[A-Za-z][A-Za-z0-9_]*\s*=/.test(String(question || ""));
+  const q = String(question || "");
+  // Matches lines like "F = ...", "Sum = ...", "D0 = ..." and also
+  // inline equations with Boolean operators after the = sign.
+  return (
+    /(^|\n)\s*[A-Za-z][A-Za-z0-9_]*\s*=\s*[^\s]/.test(q) &&
+    /['+*&|^!~]|AND|OR|NOT|XOR|XNOR|NAND|NOR/i.test(q)
+  );
 }
 
 async function extractQuestionFromImage(file) {
@@ -368,7 +515,7 @@ async function extractQuestionFromImage(file) {
         }
       ]
     });
-    const result = JSON.parse(extractClaudeText(response));
+    const result = extractJson(extractClaudeText(response));
     return {
       question: String(result.question || "").trim(),
       equations: result.equations || [],
@@ -402,7 +549,7 @@ async function extractQuestionFromImage(file) {
     ]
   });
 
-  const result = JSON.parse(response.choices[0].message.content);
+  const result = extractJson(response.choices[0].message.content);
   return {
     question: String(result.question || "").trim(),
     equations: result.equations || [],
