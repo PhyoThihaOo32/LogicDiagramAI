@@ -108,8 +108,16 @@ function drawWire(wire, nodeMap, signalSourceY) {
   const start = outputAnchor(from);
   const end = inputAnchor(to, wire.signal, signalSourceY);
   const path = wirePath(start, end);
-  return `<path d="${path}" stroke="#f0628a" stroke-width="1.8" fill="none"/>`;
+  // stroke-linecap=round + matching tick stroke-width (1.8) makes the wire-to-
+  // tick handoff a single continuous segment with no thickness step or gap.
+  return `<path d="${path}" stroke="#f0628a" stroke-width="1.8" fill="none" stroke-linecap="round"/>`;
 }
+
+// Gates that draw a 10-px input "tick" lead extending out the left of the body.
+// For these the wire must end at the OUTER end of the tick so wire + tick form
+// one continuous straight lead — otherwise the wire (1.8) overlaps the tick (1.5)
+// inside the same 10-px region and the connection looks broken at the body edge.
+const TICK_GATES = new Set(["AND", "OR", "XOR", "NAND", "NOR", "XNOR"]);
 
 function wirePath(start, end) {
   // Straight line when Y difference is negligible
@@ -143,11 +151,15 @@ function outputAnchor(node) {
 
 function inputAnchor(node, signal, signalSourceY) {
   const inputs = node.inputs || [];
-  // XOR/XNOR gate body starts 9 px in from node.x due to the extra back-curve; OR/NOR/AND/NAND start at node.x
-  const edgeX = (node.type === "XOR" || node.type === "XNOR") ? node.x + 9 : node.x;
+  // XOR/XNOR gate body starts 9 px in from node.x due to the extra back-curve;
+  // OR/NOR/AND/NAND start at node.x; NOT/OUTPUT have no tick.
+  const bodyEdge = (node.type === "XOR" || node.type === "XNOR") ? node.x + 9 : node.x;
+  // Tick length matches drawInputTicks() (10 px). Wire ends at OUTER end of
+  // the tick so that wire + tick draw as one straight, continuous lead.
+  const anchorX = TICK_GATES.has(node.type) ? bodyEdge - 10 : bodyEdge;
 
   if (inputs.length <= 1) {
-    return { x: edgeX, y: node.y + node.height / 2 };
+    return { x: anchorX, y: node.y + node.height / 2 };
   }
 
   const margin = 6;
@@ -155,12 +167,12 @@ function inputAnchor(node, signal, signalSourceY) {
   if (signalSourceY && signalSourceY.has(signal)) {
     const srcY = signalSourceY.get(signal);
     const clampedY = Math.max(node.y + margin, Math.min(node.y + node.height - margin, srcY));
-    return { x: edgeX, y: clampedY };
+    return { x: anchorX, y: clampedY };
   }
 
   const index = Math.max(0, inputs.indexOf(signal));
   const gap = node.height / (inputs.length + 1);
-  return { x: edgeX, y: node.y + gap * (index + 1) };
+  return { x: anchorX, y: node.y + gap * (index + 1) };
 }
 
 function drawNode(node, signalSourceY) {
@@ -364,8 +376,9 @@ function drawInputTicks(node, signalSourceY) {
         const gap = node.height / (inputs.length + 1);
         tickY = node.y + gap * (inputs.indexOf(input) + 1);
       }
-      // Tick drawn only outside the gate body — stops exactly at the gate edge.
-      return `<line x1="${edgeX - 10}" y1="${tickY}" x2="${edgeX}" y2="${tickY}" stroke="#f0628a" stroke-width="1.5"/>`;
+      // Tick stroke width and linecap match drawWire so the wire's terminal
+      // butt-cap at (edgeX-10) joins the tick into a single continuous segment.
+      return `<line x1="${edgeX - 10}" y1="${tickY}" x2="${edgeX}" y2="${tickY}" stroke="#f0628a" stroke-width="1.8" stroke-linecap="round"/>`;
     })
     .join("");
 }
