@@ -558,4 +558,58 @@ async function extractQuestionFromImage(file) {
   };
 }
 
-module.exports = { analyzeQuestion, extractQuestionFromImage };
+// ─────────────────────────────────────────────────────────────────────────────
+// Auto-correction: when the AI cross-check disagrees with our locally-computed
+// truth table, send the disputed rows back to Claude with explicit feedback
+// and ask for corrected expressions.  Returns null if no API key, the call
+// fails, or the corrected output cannot be parsed — caller should fall back
+// to the original (uncorrected) parsed result and surface the disagreement.
+// ─────────────────────────────────────────────────────────────────────────────
+async function retryWithFeedback({ question, parsed, mismatches }) {
+  if (!process.env.ANTHROPIC_API_KEY && !process.env.CLAUDE_API_KEY) return null;
+  if (!mismatches || mismatches.length === 0) return null;
+
+  // Build a human-readable summary of the disputed rows.
+  const lines = mismatches.slice(0, 10).map((m) => {
+    const inputBits = Object.entries(m.inputs || {})
+      .map(([k, v]) => `${k}=${v}`)
+      .join(", ");
+    return `  - With ${inputBits}: output ${m.output} should be ${m.ai} but your expression gives ${m.ours}`;
+  }).join("\n");
+
+  const userMessage = [
+    `You previously generated Boolean expressions for this circuit request:`,
+    ``,
+    `  "${question}"`,
+    ``,
+    `Your previous expressions:`,
+    ...Object.entries(parsed.expressions || {}).map(([out, expr]) => `  ${out} = ${expr}`),
+    ``,
+    `These expressions produce the WRONG outputs on the following truth table rows (compared to an independent derivation of the user's intent):`,
+    ``,
+    lines,
+    ``,
+    `Generate corrected Boolean expressions that produce the correct output for ALL input combinations.`,
+    `Use the same JSON schema as before.  Inputs must remain: ${(parsed.inputs || []).join(", ")}.  Outputs must remain: ${(parsed.outputs || []).join(", ")}.`,
+    `Use ONLY AND / OR / NOT / XOR — never NAND/NOR/XNOR as operators.`,
+    `Return strict JSON only.`
+  ].join("\n");
+
+  try {
+    const client = createClaudeClient();
+    const message = await client.messages.create({
+      model: claudeModel(),
+      max_tokens: 1400,
+      // Reuse the same system prompt → same cache hit.
+      system: [{ type: "text", text: CIRCUIT_EXTRACTION_PROMPT, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: userMessage }]
+    });
+    const corrected = coerceParsedCircuit(extractJson(extractClaudeText(message)), question);
+    return corrected;
+  } catch (error) {
+    console.warn("AI auto-correction failed:", error.message);
+    return null;
+  }
+}
+
+module.exports = { analyzeQuestion, extractQuestionFromImage, retryWithFeedback };

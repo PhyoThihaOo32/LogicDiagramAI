@@ -1,6 +1,6 @@
 const express = require("express");
 const multer = require("multer");
-const { analyzeQuestion, extractQuestionFromImage } = require("../services/aiService");
+const { analyzeQuestion, extractQuestionFromImage, retryWithFeedback } = require("../services/aiService");
 const { generateTruthTable } = require("../services/truthTableService");
 const { buildCircuitModel } = require("../services/circuitModelService");
 const { generateDiagramSvg } = require("../services/circuitDiagramService");
@@ -8,6 +8,7 @@ const { generateInstructions } = require("../services/circuitVerseInstructionSer
 const { createDownloadBundle } = require("../services/downloadBundleService");
 const { parseExpression } = require("../utils/booleanEvaluator");
 const { runAiCrossCheck } = require("../services/aiVerificationService");
+const { verifyModelGraph } = require("../services/circuitSimulationService");
 
 const router = express.Router();
 const upload = multer({
@@ -42,42 +43,76 @@ router.post("/analyze", handleUpload, async (req, res) => {
       return res.status(400).json({ success: false, error: "Question is required." });
     }
 
-    const parsed = await analyzeQuestion(question);
+    // ── Stage 1: AI extracts circuit from user input ───────────────────────
+    let parsed = await analyzeQuestion(question);
+    let truthTable = generateTruthTable(parsed);
+
+    // ── Stage 2: AI cross-check (independent Claude call) ──────────────────
+    // Catches wrong-but-internally-consistent expressions by comparing our
+    // locally-evaluated truth table against an independent Claude derivation.
+    let aiCrossCheck = { skipped: true, reason: "No AI client configured" };
+    let autoCorrected = false;
+    let claudeClient = null;
+    let claudeModel = null;
+    if (process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY) {
+      try {
+        const Anthropic = require("@anthropic-ai/sdk");
+        claudeClient = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY });
+        claudeModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-5";
+        aiCrossCheck = await runAiCrossCheck({ question, parsed, ourTruthTable: truthTable, claudeClient, claudeModel });
+      } catch (error) {
+        aiCrossCheck = { skipped: true, reason: `Cross-check error: ${error.message}` };
+      }
+    }
+
+    // ── Stage 3: Auto-correction loop (only if cross-check disagreed) ──────
+    // Send the disputed rows back to Claude with explicit feedback and ask
+    // for corrected expressions. If the corrected version passes the
+    // cross-check, swap it in transparently.
+    if (claudeClient && !aiCrossCheck.skipped && aiCrossCheck.compared && aiCrossCheck.match === false && aiCrossCheck.mismatches?.length) {
+      const corrected = await retryWithFeedback({ question, parsed, mismatches: aiCrossCheck.mismatches });
+      if (corrected) {
+        const correctedTable = generateTruthTable(corrected);
+        const recheck = await runAiCrossCheck({
+          question,
+          parsed: corrected,
+          ourTruthTable: correctedTable,
+          claudeClient,
+          claudeModel
+        });
+        if (!recheck.skipped && recheck.compared && recheck.match) {
+          // Auto-correction succeeded — replace everything downstream.
+          parsed = corrected;
+          truthTable = correctedTable;
+          aiCrossCheck = recheck;
+          autoCorrected = true;
+        } else {
+          // Mark that we tried but the retry also failed.
+          aiCrossCheck.retryAttempted = true;
+        }
+      } else {
+        aiCrossCheck.retryAttempted = true;
+        aiCrossCheck.retryFailed = true;
+      }
+    }
+
+    // ── Stage 4: Build model + diagram from the (possibly corrected) parse ─
     const cvAvailable = parsed.type !== "sequential";
-    const truthTable = generateTruthTable(parsed);
     const circuitModel = buildCircuitModel(parsed);
     circuitModel.projectName = formatCircuitName(parsed);
     const diagramSvg = generateDiagramSvg(circuitModel);
     const instructions = generateInstructions(parsed, circuitModel);
     const simulatorCircuit = cvAvailable ? generateSimulatorCircuit(circuitModel) : null;
     const bundle = createDownloadBundle({ circuitModel, diagramSvg, truthTable, instructions, simulatorCircuit, cvAvailable });
-    const verification = verifyParsed(parsed, truthTable);
 
-    // ── AI cross-check ──────────────────────────────────────────────────────
-    // Independent Claude call: given only the user's question + I/O names,
-    // generate the expected truth table and compare with our locally-computed
-    // one. Catches the case where Claude's expressions are wrong but
-    // self-consistent (e.g. swapped Sum/Carry on a half adder).
-    let aiCrossCheck = { skipped: true, reason: "No AI client configured" };
-    if (process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY) {
-      try {
-        const Anthropic = require("@anthropic-ai/sdk");
-        const claudeClient = new Anthropic({
-          apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
-        });
-        const claudeModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-5";
-        aiCrossCheck = await runAiCrossCheck({
-          question,
-          parsed,
-          ourTruthTable: truthTable,
-          claudeClient,
-          claudeModel
-        });
-      } catch (error) {
-        aiCrossCheck = { skipped: true, reason: `Cross-check error: ${error.message}` };
-      }
-    }
+    // ── Stage 5: Local verification (parse + graph-simulation correctness) ─
+    const verification = verifyParsed(parsed, truthTable);
     verification.aiCrossCheck = aiCrossCheck;
+    verification.autoCorrected = autoCorrected;
+    // Independently simulate the gate graph and confirm it computes the
+    // same truth table the expressions did. Catches buildCircuitModel bugs
+    // (wrong wire source, gate type swap) that AI verification cannot see.
+    verification.modelGraphCheck = verifyModelGraph(circuitModel, parsed);
 
     res.json({
       success: true,

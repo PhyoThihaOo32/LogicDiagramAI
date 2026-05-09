@@ -249,26 +249,32 @@ function renderSummary(data) {
 function buildMiniVerifyChip(verification) {
   if (!verification) return "";
   const ai = verification.aiCrossCheck;
+  const graph = verification.modelGraphCheck;
+  const corrected = verification.autoCorrected ? `<span class="auto-fix-tag">Auto-corrected by AI</span>` : "";
 
-  // ── AI cross-check failure is the most important signal: it means our
-  //    expressions disagree with what an independent AI thinks the user asked
-  //    for, so the diagram is likely wrong.
+  // ── AI cross-check disagreement is the most important failure signal.
   if (ai && !ai.skipped && ai.compared && ai.match === false) {
-    return `<div class="verify-chip failed">⚠ AI cross-check disagreed on ${escapeHtml(String(ai.mismatchCount))} of ${escapeHtml(String(ai.rowsCompared))} truth-table rows &mdash; the chosen expressions may not match what you asked for. See the Truth Table tab for the disputed rows.</div>`;
+    return `<div class="verify-chip failed">⚠ AI cross-check disagreed on ${escapeHtml(String(ai.mismatchCount))} of ${escapeHtml(String(ai.rowsCompared))} rows &mdash; the chosen expressions may not match what you asked for. See the Truth Table tab for the disputed rows.</div>`;
   }
 
-  // Local parse + AI cross-check both passed → strongest verification.
+  // ── Model graph simulation found a wiring bug (rare; means buildCircuitModel
+  //    produced a graph that doesn't compute what the expressions say).
+  if (graph && !graph.skipped && graph.verified === false) {
+    return `<div class="verify-chip failed">⚠ Diagram does not match expressions on ${escapeHtml(String(graph.issueCount))} of ${escapeHtml(String(graph.rowsTested))} rows &mdash; the SVG wiring may be incorrect even though the truth table is right. Please report this circuit.</div>`;
+  }
+
+  // ── Strongest signal: AI cross-check passed AND graph simulation passed.
+  if (verification.verified && ai && !ai.skipped && ai.compared && ai.match && graph && !graph.skipped && graph.verified) {
+    return `<div class="verify-chip verified">✓ Triple-verified &mdash; expressions parse, gate graph simulates correctly across all ${escapeHtml(String(graph.rowsTested))} rows, and an independent Claude call agreed on every output. ${corrected}</div>`;
+  }
   if (verification.verified && ai && !ai.skipped && ai.compared && ai.match) {
-    return `<div class="verify-chip verified">✓ Verified by independent AI cross-check &mdash; all ${escapeHtml(String(ai.rowsCompared))} truth-table rows match a second Claude call that derived the table directly from your question.</div>`;
+    return `<div class="verify-chip verified">✓ Double-verified by independent AI cross-check &mdash; all ${escapeHtml(String(ai.rowsCompared))} rows match a second Claude derivation. ${corrected}</div>`;
   }
-
-  // Local checks passed but cross-check was skipped (no API key, sequential, too many inputs).
   if (verification.verified) {
-    const reason = ai && ai.skipped ? ` (cross-check skipped: ${escapeHtml(ai.reason || "n/a")})` : "";
-    return `<div class="verify-chip verified">✓ Logic verified &mdash; expressions evaluated cleanly across all ${escapeHtml(String(verification.rows))} truth table rows${reason}.</div>`;
+    const reason = ai && ai.skipped ? ` (AI cross-check skipped: ${escapeHtml(ai.reason || "n/a")})` : "";
+    return `<div class="verify-chip verified">✓ Logic verified &mdash; expressions evaluated cleanly across all ${escapeHtml(String(verification.rows))} rows${reason}. ${corrected}</div>`;
   }
-
-  return `<div class="verify-chip failed">⚠ Verification found issues &mdash; check the Truth Table tab for details. The diagram may not match your intended logic.</div>`;
+  return `<div class="verify-chip failed">⚠ Verification found issues &mdash; check the Truth Table tab for details.</div>`;
 }
 
 function renderTruthTable(rows, verification) {
@@ -300,19 +306,30 @@ function renderTruthTable(rows, verification) {
 function buildVerifyBadge(verification) {
   if (!verification) return "";
   const ai = verification.aiCrossCheck;
+  const graph = verification.modelGraphCheck;
   const aiBlock = buildAiCrossCheckBlock(ai);
+  const graphBlock = buildGraphCheckBlock(graph);
+  const corrected = verification.autoCorrected
+    ? `<div class="auto-fix-banner">🔧 The original AI answer disagreed with the expected truth table — Claude was asked to correct itself with the disputed rows as feedback. The corrected version is shown below.</div>`
+    : "";
 
   if (ai && !ai.skipped && ai.compared && ai.match === false) {
-    return `<div class="verify-badge failed">⚠ AI CROSS-CHECK DISAGREED &mdash; ${escapeHtml(String(ai.mismatchCount))} of ${escapeHtml(String(ai.rowsCompared))} rows differ between the locally-evaluated truth table and an independent Claude derivation.${aiBlock}</div>`;
+    return `<div class="verify-badge failed">⚠ AI CROSS-CHECK DISAGREED &mdash; ${escapeHtml(String(ai.mismatchCount))} of ${escapeHtml(String(ai.rowsCompared))} rows differ between the locally-evaluated truth table and an independent Claude derivation.${aiBlock}${graphBlock}</div>`;
+  }
+  if (graph && !graph.skipped && graph.verified === false) {
+    return `<div class="verify-badge failed">⚠ DIAGRAM DOES NOT MATCH EXPRESSIONS &mdash; the gate graph simulation diverged from the truth table on ${escapeHtml(String(graph.issueCount))} row(s).${graphBlock}${aiBlock}</div>`;
+  }
+  if (verification.verified && ai && !ai.skipped && ai.compared && ai.match && graph && !graph.skipped && graph.verified) {
+    return `<div class="verify-badge verified">${corrected}✓ TRIPLE-VERIFIED &mdash; expressions parse, gate graph simulates correctly across ${escapeHtml(String(graph.rowsTested))} row(s), and an independent Claude call agreed on every output.${aiBlock}${graphBlock}</div>`;
   }
   if (verification.verified && ai && !ai.skipped && ai.compared && ai.match) {
-    return `<div class="verify-badge verified">✓ DOUBLE-VERIFIED &mdash; expressions evaluate cleanly AND an independent Claude call agreed on all ${escapeHtml(String(ai.rowsCompared))} rows.${aiBlock}</div>`;
+    return `<div class="verify-badge verified">${corrected}✓ DOUBLE-VERIFIED &mdash; expressions evaluate cleanly AND an independent Claude call agreed on all ${escapeHtml(String(ai.rowsCompared))} rows.${aiBlock}${graphBlock}</div>`;
   }
   if (verification.verified) {
-    return `<div class="verify-badge verified">✓ VERIFIED &mdash; ${escapeHtml(verification.summary)}${aiBlock}</div>`;
+    return `<div class="verify-badge verified">${corrected}✓ VERIFIED &mdash; ${escapeHtml(verification.summary)}${aiBlock}${graphBlock}</div>`;
   }
   const issueList = (verification.issues || []).map((i) => `<li>${escapeHtml(i)}</li>`).join("");
-  return `<div class="verify-badge failed">⚠ ISSUES DETECTED &mdash; ${escapeHtml(verification.summary)}${issueList ? `<ul>${issueList}</ul>` : ""}${aiBlock}</div>`;
+  return `<div class="verify-badge failed">⚠ ISSUES DETECTED &mdash; ${escapeHtml(verification.summary)}${issueList ? `<ul>${issueList}</ul>` : ""}${aiBlock}${graphBlock}</div>`;
 }
 
 function renderDownloads(data) {
@@ -470,6 +487,27 @@ function buildAiCrossCheckBlock(ai) {
     : "";
 
   return `<div class="ai-check-note"><strong>Disputed rows:</strong><ul class="ai-check-list">${rows}${more}</ul></div>`;
+}
+
+/**
+ * Render the model-graph simulation result. The graph is built from the same
+ * expressions the truth table uses, so a divergence here means a wiring/model
+ * bug — distinct from an AI logic error.
+ */
+function buildGraphCheckBlock(graph) {
+  if (!graph) return "";
+  if (graph.skipped) return "";
+  if (graph.verified) return "";
+  const rows = (graph.issues || []).map((i) => {
+    const inputs = Object.entries(i.inputs || {})
+      .map(([k, v]) => `${escapeHtml(k)}=${escapeHtml(String(v))}`)
+      .join(", ");
+    return `<li>row (${inputs}): output <code>${escapeHtml(i.output)}</code> &mdash; expressions say <strong>${escapeHtml(String(i.expected))}</strong>, gate graph simulated <strong>${escapeHtml(String(i.simulated))}</strong> (driven by <code>${escapeHtml(i.drivenBy || "?")}</code>)</li>`;
+  }).join("");
+  const more = graph.issueCount > (graph.issues?.length || 0)
+    ? `<li>… and ${escapeHtml(String(graph.issueCount - graph.issues.length))} more</li>`
+    : "";
+  return `<div class="ai-check-note"><strong>Diagram simulation diverged from expressions:</strong><ul class="ai-check-list">${rows}${more}</ul></div>`;
 }
 
 function escapeHtml(value) {
