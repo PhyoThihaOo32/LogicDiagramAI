@@ -248,9 +248,26 @@ function renderSummary(data) {
 
 function buildMiniVerifyChip(verification) {
   if (!verification) return "";
-  if (verification.verified) {
-    return `<div class="verify-chip verified">✓ Logic verified &mdash; expressions evaluated cleanly across all ${escapeHtml(String(verification.rows))} truth table rows. Review the expressions below to confirm the AI interpreted your question correctly.</div>`;
+  const ai = verification.aiCrossCheck;
+
+  // ── AI cross-check failure is the most important signal: it means our
+  //    expressions disagree with what an independent AI thinks the user asked
+  //    for, so the diagram is likely wrong.
+  if (ai && !ai.skipped && ai.compared && ai.match === false) {
+    return `<div class="verify-chip failed">⚠ AI cross-check disagreed on ${escapeHtml(String(ai.mismatchCount))} of ${escapeHtml(String(ai.rowsCompared))} truth-table rows &mdash; the chosen expressions may not match what you asked for. See the Truth Table tab for the disputed rows.</div>`;
   }
+
+  // Local parse + AI cross-check both passed → strongest verification.
+  if (verification.verified && ai && !ai.skipped && ai.compared && ai.match) {
+    return `<div class="verify-chip verified">✓ Verified by independent AI cross-check &mdash; all ${escapeHtml(String(ai.rowsCompared))} truth-table rows match a second Claude call that derived the table directly from your question.</div>`;
+  }
+
+  // Local checks passed but cross-check was skipped (no API key, sequential, too many inputs).
+  if (verification.verified) {
+    const reason = ai && ai.skipped ? ` (cross-check skipped: ${escapeHtml(ai.reason || "n/a")})` : "";
+    return `<div class="verify-chip verified">✓ Logic verified &mdash; expressions evaluated cleanly across all ${escapeHtml(String(verification.rows))} truth table rows${reason}.</div>`;
+  }
+
   return `<div class="verify-chip failed">⚠ Verification found issues &mdash; check the Truth Table tab for details. The diagram may not match your intended logic.</div>`;
 }
 
@@ -282,11 +299,20 @@ function renderTruthTable(rows, verification) {
 
 function buildVerifyBadge(verification) {
   if (!verification) return "";
+  const ai = verification.aiCrossCheck;
+  const aiBlock = buildAiCrossCheckBlock(ai);
+
+  if (ai && !ai.skipped && ai.compared && ai.match === false) {
+    return `<div class="verify-badge failed">⚠ AI CROSS-CHECK DISAGREED &mdash; ${escapeHtml(String(ai.mismatchCount))} of ${escapeHtml(String(ai.rowsCompared))} rows differ between the locally-evaluated truth table and an independent Claude derivation.${aiBlock}</div>`;
+  }
+  if (verification.verified && ai && !ai.skipped && ai.compared && ai.match) {
+    return `<div class="verify-badge verified">✓ DOUBLE-VERIFIED &mdash; expressions evaluate cleanly AND an independent Claude call agreed on all ${escapeHtml(String(ai.rowsCompared))} rows.${aiBlock}</div>`;
+  }
   if (verification.verified) {
-    return `<div class="verify-badge verified">✓ VERIFIED &mdash; ${escapeHtml(verification.summary)}</div>`;
+    return `<div class="verify-badge verified">✓ VERIFIED &mdash; ${escapeHtml(verification.summary)}${aiBlock}</div>`;
   }
   const issueList = (verification.issues || []).map((i) => `<li>${escapeHtml(i)}</li>`).join("");
-  return `<div class="verify-badge failed">⚠ ISSUES DETECTED &mdash; ${escapeHtml(verification.summary)}${issueList ? `<ul>${issueList}</ul>` : ""}</div>`;
+  return `<div class="verify-badge failed">⚠ ISSUES DETECTED &mdash; ${escapeHtml(verification.summary)}${issueList ? `<ul>${issueList}</ul>` : ""}${aiBlock}</div>`;
 }
 
 function renderDownloads(data) {
@@ -418,6 +444,32 @@ function buildInitialStateHint(parsed) {
 function dlIcon(type) {
   const icons = { cv: "🔌", svg: "🖼", csv: "📊", txt: "📋", json: "🗂" };
   return icons[type] || "📄";
+}
+
+/**
+ * Render the AI cross-check details (disputed rows or skip reason)
+ * as a small inline block to append to the main verify badge.
+ */
+function buildAiCrossCheckBlock(ai) {
+  if (!ai) return "";
+  if (ai.skipped) {
+    return `<div class="ai-check-note">AI cross-check skipped &mdash; ${escapeHtml(ai.reason || "n/a")}.</div>`;
+  }
+  if (!ai.compared) return "";
+  if (ai.match) return "";
+
+  const rows = (ai.mismatches || []).map((m) => {
+    const inputs = Object.entries(m.inputs || {})
+      .map(([k, v]) => `${escapeHtml(k)}=${escapeHtml(String(v))}`)
+      .join(", ");
+    return `<li>row ${escapeHtml(String(m.rowIndex))} (${inputs}): output <code>${escapeHtml(m.output)}</code> &mdash; local says <strong>${escapeHtml(String(m.ours))}</strong>, AI expected <strong>${escapeHtml(String(m.ai))}</strong></li>`;
+  }).join("");
+
+  const more = ai.mismatchCount > (ai.mismatches?.length || 0)
+    ? `<li>… and ${escapeHtml(String(ai.mismatchCount - ai.mismatches.length))} more</li>`
+    : "";
+
+  return `<div class="ai-check-note"><strong>Disputed rows:</strong><ul class="ai-check-list">${rows}${more}</ul></div>`;
 }
 
 function escapeHtml(value) {

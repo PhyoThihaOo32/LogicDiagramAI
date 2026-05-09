@@ -880,6 +880,41 @@ li:hover {
   color: var(--danger);
 }
 
+/* ── AI cross-check details (disputed rows / skip reason) ─────────────────── */
+.ai-check-note {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(255,255,255,0.1);
+  font-weight: 400;
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.7);
+}
+.ai-check-note strong { color: rgba(255,255,255,0.92); font-weight: 700; }
+.ai-check-list {
+  margin: 6px 0 0 0;
+  padding-left: 18px;
+  list-style: disc;
+}
+.ai-check-list li {
+  padding: 3px 0;
+  background: none;
+  border: none;
+  border-radius: 0;
+  font-size: 0.78rem;
+  counter-increment: none;
+  transform: none !important;
+  color: rgba(255,255,255,0.78);
+  line-height: 1.55;
+}
+.ai-check-list li::before { display: none; }
+.ai-check-list code {
+  background: rgba(255,255,255,0.06);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.78rem;
+  color: var(--accent-2);
+}
+
 /* ── Textarea char counter ─────────────────────────────────────────────────── */
 .char-hint {
   font-size: 0.7rem;

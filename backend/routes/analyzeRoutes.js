@@ -7,6 +7,7 @@ const { generateDiagramSvg } = require("../services/circuitDiagramService");
 const { generateInstructions } = require("../services/circuitVerseInstructionService");
 const { createDownloadBundle } = require("../services/downloadBundleService");
 const { parseExpression } = require("../utils/booleanEvaluator");
+const { runAiCrossCheck } = require("../services/aiVerificationService");
 
 const router = express.Router();
 const upload = multer({
@@ -51,6 +52,32 @@ router.post("/analyze", handleUpload, async (req, res) => {
     const simulatorCircuit = cvAvailable ? generateSimulatorCircuit(circuitModel) : null;
     const bundle = createDownloadBundle({ circuitModel, diagramSvg, truthTable, instructions, simulatorCircuit, cvAvailable });
     const verification = verifyParsed(parsed, truthTable);
+
+    // ── AI cross-check ──────────────────────────────────────────────────────
+    // Independent Claude call: given only the user's question + I/O names,
+    // generate the expected truth table and compare with our locally-computed
+    // one. Catches the case where Claude's expressions are wrong but
+    // self-consistent (e.g. swapped Sum/Carry on a half adder).
+    let aiCrossCheck = { skipped: true, reason: "No AI client configured" };
+    if (process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY) {
+      try {
+        const Anthropic = require("@anthropic-ai/sdk");
+        const claudeClient = new Anthropic({
+          apiKey: process.env.ANTHROPIC_API_KEY || process.env.CLAUDE_API_KEY
+        });
+        const claudeModel = process.env.CLAUDE_MODEL || "claude-sonnet-4-5";
+        aiCrossCheck = await runAiCrossCheck({
+          question,
+          parsed,
+          ourTruthTable: truthTable,
+          claudeClient,
+          claudeModel
+        });
+      } catch (error) {
+        aiCrossCheck = { skipped: true, reason: `Cross-check error: ${error.message}` };
+      }
+    }
+    verification.aiCrossCheck = aiCrossCheck;
 
     res.json({
       success: true,
@@ -168,6 +195,7 @@ function verifyParsed(parsed, truthTable) {
     summary: issues.length === 0
       ? `All ${truthTable.length} row(s) × ${outputs.length} output(s) successfully evaluated from ${inputs.length} declared input(s).`
       : issues.join(" · ")
+    // aiCrossCheck is attached after construction by the caller.
   };
 }
 
