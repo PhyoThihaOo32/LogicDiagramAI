@@ -103,6 +103,16 @@ function buildCircuitModel(parsed) {
     rerouteStateVariableWiresToFlipFlops(model, stateVariables, parsed.flipFlops);
   }
 
+  // For multi-output combinational circuits (decoders, mux arrays, parity
+  // checkers, etc.), each output expression may have a different natural
+  // depth — e.g. in a 2-to-4 decoder, D3=A·B is depth 1 while D0=A'·B' is
+  // depth 2. Without alignment the shallower root gate lands in the same
+  // column as the NOT gates, producing a messy layout where output gates
+  // are interleaved with intermediate gates. Force every external output's
+  // root gate to the deepest output column so the final stage of the
+  // circuit sits in one uniform column — the textbook layout.
+  alignOutputRootsToCommonDepth(model, parsed, outputSignals);
+
   // Global deconfliction: gates from different output expressions can land at the
   // same (x, y) column. Push overlapping gates apart so the diagram is readable.
   deconflictGlobalPositions(model.gates);
@@ -479,6 +489,43 @@ function resolveColumnCollisions(positions) {
         });
       }
     });
+  });
+}
+
+// For multi-output circuits (decoders, mux arrays, etc.) each output expression
+// has a natural depth determined by how many levels of gates it needs.  A
+// simpler expression such as D3 = A·B (depth 1) ends up in the same x-column
+// as the NOT gates while a deeper expression such as D0 = A'·B' (depth 2)
+// correctly lands one column further right.  This function finds the deepest
+// x-position across all external-output root gates and shifts any shallower
+// root gate to that same column so the final logic stage sits in one uniform
+// column — the textbook layout expected by users.
+function alignOutputRootsToCommonDepth(model, parsed, outputSignals) {
+  const externalOutputs = (parsed.outputs || []).filter(
+    (output) => !isFlipFlopInputOutput(parsed, output)
+  );
+  // Nothing to align when there is only one external output.
+  if (externalOutputs.length < 2) return;
+
+  const gatesById = new Map(model.gates.map((g) => [g.id, g]));
+  const rootGates = [];
+
+  for (const output of externalOutputs) {
+    const sig = outputSignals.get(output);
+    if (!sig || !sig.sourceId) continue;
+    const root = gatesById.get(sig.sourceId);
+    // Skip if the sourceId resolves to no gate (bare VAR / input signal) or to
+    // a CONST or OUTPUT node — these are not real logic root gates.
+    if (!root || root.type === "CONST" || root.type === "OUTPUT") continue;
+    rootGates.push(root);
+  }
+
+  // Need at least two root gates to meaningfully align them.
+  if (rootGates.length < 2) return;
+
+  const maxX = Math.max(...rootGates.map((g) => g.x));
+  rootGates.forEach((g) => {
+    if (g.x < maxX) g.x = maxX;
   });
 }
 

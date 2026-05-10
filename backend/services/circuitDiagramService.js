@@ -133,10 +133,14 @@ function wirePath(start, end) {
     return `M ${start.x} ${start.y} L ${elbowX} ${start.y} L ${elbowX} ${end.y} L ${end.x} ${end.y}`;
   }
 
-  // Elbow routing: go right from start, bend vertically, arrive at end.
-  // Place the elbow column close to the target so the horizontal segment into
-  // the gate is short and the long run stays on the source side.
-  const elbowX = Math.max(start.x + 14, end.x - 20);
+  // Elbow routing: bend CLOSE TO THE SOURCE (14 px stub) then travel the
+  // long horizontal at the destination Y.  This "left-elbow" style prevents
+  // wires from running horizontally at the source Y all the way across
+  // intermediate gate columns — e.g. in a 2-to-4 decoder the direct A/B wires
+  // to the D3 AND gate would otherwise pass right through the NOT gate bodies
+  // at the same Y.  Bending early puts the long horizontal at the clamped
+  // input-tick Y of the destination gate, which clears the intermediate gates.
+  const elbowX = start.x + 14;
   return `M ${start.x} ${start.y} L ${elbowX} ${start.y} L ${elbowX} ${end.y} L ${end.x} ${end.y}`;
 }
 
@@ -179,8 +183,15 @@ function inputAnchor(node, signal, signalSourceY) {
 
   if (signalSourceY && signalSourceY.has(signal)) {
     const srcY = signalSourceY.get(signal);
-    const clampedY = Math.max(node.y + margin, Math.min(node.y + node.height - margin, srcY));
-    return { x: anchorX, y: clampedY };
+    // Only snap to srcY when it actually falls inside the gate's body range.
+    // When srcY is outside (wire arrives from far above or below the gate),
+    // clamping all such inputs to the same boundary margin causes them to
+    // draw at identical Y values and overlap — e.g. in a half adder both A and
+    // B are above the AND gate after deconfliction pushes it down.  The
+    // gap-based fallback distributes them evenly across the gate face instead.
+    if (srcY >= node.y + margin && srcY <= node.y + node.height - margin) {
+      return { x: anchorX, y: srcY };
+    }
   }
 
   const index = Math.max(0, inputs.indexOf(signal));
@@ -393,7 +404,14 @@ function drawInputTicks(node, signalSourceY) {
       let tickY;
       if (signalSourceY && signalSourceY.has(input)) {
         const srcY = signalSourceY.get(input);
-        tickY = Math.max(node.y + margin, Math.min(node.y + node.height - margin, srcY));
+        // Snap to srcY only when it lies within the gate body — mirrors the
+        // logic in inputAnchor() so wire endpoints and ticks always agree.
+        if (srcY >= node.y + margin && srcY <= node.y + node.height - margin) {
+          tickY = srcY;
+        } else {
+          const gap = node.height / (inputs.length + 1);
+          tickY = node.y + gap * (inputs.indexOf(input) + 1);
+        }
       } else {
         const gap = node.height / (inputs.length + 1);
         tickY = node.y + gap * (inputs.indexOf(input) + 1);
