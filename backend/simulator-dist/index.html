@@ -265,100 +265,260 @@
     /* ── Properties panel — floating, draggable ─────────────────────────────── */
     #moduleProperty,
     #propertiesPanel {
-      display: none;            /* hidden until jQuery .show() is called          */
+      display: none;
       position: absolute !important;
-      right: 10px;              /* no !important — jQuery UI will override to left/top */
+      right: 12px;          /* jQuery UI overrides to left/top when dragged        */
       bottom: 60px;
-      width: 220px !important;
-      max-height: 55vh !important;
+      width: 260px !important;
+      max-height: 60vh !important;
       overflow-y: auto !important;
+      overflow-x: hidden !important;
       z-index: 150 !important;
-      background: rgba(13,13,26,0.97) !important;
-      border: 1px solid rgba(240,98,138,0.3) !important;
-      border-radius: 10px !important;
-      padding: 0 !important;    /* drag handle has its own padding                */
+      background: #0e0e1e !important;
+      border: 1px solid rgba(240,98,138,0.28) !important;
+      border-radius: 12px !important;
+      padding: 0 !important;
       color: #d0d0f0 !important;
-      font-family: Arial, sans-serif !important;
+      font-family: 'Inter', Arial, sans-serif !important;
       font-size: 12px !important;
-      backdrop-filter: blur(8px) !important;
-      box-shadow: 0 4px 24px rgba(0,0,0,0.5) !important;
+      backdrop-filter: blur(12px) !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(255,255,255,0.04) !important;
       cursor: default;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(240,98,138,0.3) transparent;
     }
-    /* Drag handle strip at the top of the properties panel */
+
+    /* ── Drag handle ─────────────────────────────────────────────────────────── */
     #moduleProperty::before,
     #propertiesPanel::before {
-      content: "⠿ Properties";
-      display: block;
-      padding: 6px 10px 5px;
-      font-size: 10px;
+      content: "⠿  PROPERTIES";
+      display: flex;
+      align-items: center;
+      padding: 9px 14px 8px;
+      font-size: 9.5px;
       font-weight: 700;
-      letter-spacing: 0.07em;
-      text-transform: uppercase;
+      letter-spacing: 0.12em;
       color: #f0628a;
-      background: #12122a;
-      border-bottom: 1px solid rgba(240,98,138,0.18);
-      border-radius: 10px 10px 0 0;
+      background: rgba(240,98,138,0.07);
+      border-bottom: 1px solid rgba(240,98,138,0.16);
+      border-radius: 12px 12px 0 0;
       cursor: move;
       user-select: none;
     }
-    /* Inner content area — restore padding removed from the panel itself */
+
+    /* ── Inner content area ──────────────────────────────────────────────────── */
     #moduleProperty-inner,
     #moduleProperty > div,
     #propertiesPanel > div {
-      padding: 10px !important;
+      padding: 12px 14px !important;
     }
+
+    /* Reset child colours / backgrounds */
     #moduleProperty *,
     #propertiesPanel * {
-      color: #d0d0f0 !important;
+      color: #c8c8e8 !important;
       background: transparent !important;
-      border-color: rgba(240,98,138,0.2) !important;
+      border-color: rgba(240,98,138,0.18) !important;
       font-size: 12px !important;
+      box-sizing: border-box !important;
     }
-    #moduleProperty input,
-    #moduleProperty select,
-    #propertiesPanel input,
-    #propertiesPanel select {
-      background: #1a1a2e !important;
-      color: #e0e0f8 !important;
-      border: 1px solid rgba(240,98,138,0.3) !important;
-      border-radius: 4px !important;
-      padding: 3px 6px !important;
-      outline: none !important;
-    }
-    #moduleProperty input:focus,
-    #moduleProperty select:focus,
-    #propertiesPanel input:focus,
-    #propertiesPanel select:focus {
-      border-color: #f0628a !important;
-    }
-    #moduleProperty label,
-    #propertiesPanel label {
-      color: #9898c8 !important;
-      font-size: 10.5px !important;
-    }
-    /* Properties panel header */
-    #moduleProperty .propertyHeader,
-    #propertiesPanel .property-title {
-      color: #f0628a !important;
+
+    /* ── Section heading ("Project Properties") ──────────────────────────────── */
+    #moduleProperty .moduleProperty-header,
+    #propertiesPanel .moduleProperty-header {
+      font-size: 10px !important;
       font-weight: 700 !important;
-      font-size: 12px !important;
-      border-bottom: 1px solid rgba(240,98,138,0.2) !important;
-      padding-bottom: 6px !important;
-      margin-bottom: 8px !important;
+      letter-spacing: 0.1em !important;
+      text-transform: uppercase !important;
+      color: #9898c8 !important;
+      margin: 0 0 10px !important;
+      padding-bottom: 8px !important;
+      border-bottom: 1px solid rgba(240,98,138,0.14) !important;
     }
-    #moduleProperty button,
-    #propertiesPanel button {
-      background: rgba(240,98,138,0.15) !important;
-      border: 1px solid rgba(240,98,138,0.35) !important;
-      color: #f0628a !important;
-      border-radius: 4px !important;
-      padding: 3px 8px !important;
-      cursor: pointer !important;
+
+    /* ── Rows (<p> tags) ─────────────────────────────────────────────────────── */
+    #moduleProperty p,
+    #propertiesPanel p {
+      display: flex !important;
+      align-items: center !important;
+      justify-content: space-between !important;
+      gap: 8px !important;
+      margin: 0 0 8px !important;
+      padding: 0 !important;
+      flex-wrap: nowrap !important;
+    }
+    #moduleProperty p:last-child,
+    #propertiesPanel p:last-child { margin-bottom: 0 !important; gap: 6px !important; }
+
+    /* ── Labels (span inside p) ──────────────────────────────────────────────── */
+    #moduleProperty p > span,
+    #propertiesPanel p > span {
+      flex-shrink: 0 !important;
+      color: #8888b8 !important;
       font-size: 11px !important;
+      white-space: nowrap !important;
     }
-    #moduleProperty button:hover,
-    #propertiesPanel button:hover {
+
+    /* ── Text / number inputs ────────────────────────────────────────────────── */
+    #moduleProperty input[type="text"],
+    #moduleProperty input[type="number"],
+    #moduleProperty select,
+    #propertiesPanel input[type="text"],
+    #propertiesPanel input[type="number"],
+    #propertiesPanel select {
+      flex: 1 !important;
+      min-width: 0 !important;
+      width: auto !important;
+      background: rgba(255,255,255,0.05) !important;
+      color: #e8e8ff !important;
+      border: 1px solid rgba(240,98,138,0.25) !important;
+      border-radius: 6px !important;
+      padding: 5px 8px !important;
+      outline: none !important;
+      transition: border-color 0.15s !important;
+    }
+    #moduleProperty input[type="text"]:focus,
+    #moduleProperty input[type="number"]:focus,
+    #moduleProperty select:focus,
+    #propertiesPanel input[type="text"]:focus,
+    #propertiesPanel input[type="number"]:focus,
+    #propertiesPanel select:focus {
+      border-color: rgba(240,98,138,0.7) !important;
+      background: rgba(240,98,138,0.06) !important;
+    }
+
+    /* ── Bootstrap-input-spinner (Clock Time −/+) ────────────────────────────── */
+    #moduleProperty .input-group,
+    #propertiesPanel .input-group {
+      display: flex !important;
+      align-items: stretch !important;
+      flex: 1 !important;
+      min-width: 0 !important;
+      border-radius: 6px !important;
+      overflow: hidden !important;
+      border: 1px solid rgba(240,98,138,0.25) !important;
+    }
+    #moduleProperty .input-group .btn-minus,
+    #moduleProperty .input-group .btn-plus,
+    #propertiesPanel .input-group .btn-minus,
+    #propertiesPanel .input-group .btn-plus {
+      flex: 0 0 30px !important;
+      width: 30px !important;
+      padding: 0 !important;
+      background: rgba(240,98,138,0.1) !important;
+      border: none !important;
+      border-radius: 0 !important;
+      color: #f0628a !important;
+      font-size: 15px !important;
+      font-weight: 600 !important;
+      line-height: 1 !important;
+      cursor: pointer !important;
+      transition: background 0.15s !important;
+    }
+    #moduleProperty .input-group .btn-minus:hover,
+    #moduleProperty .input-group .btn-plus:hover,
+    #propertiesPanel .input-group .btn-minus:hover,
+    #propertiesPanel .input-group .btn-plus:hover {
+      background: rgba(240,98,138,0.24) !important;
+    }
+    #moduleProperty .input-group .form-control-text-input,
+    #propertiesPanel .input-group .form-control-text-input {
+      flex: 1 !important;
+      width: auto !important;
+      min-width: 0 !important;
+      text-align: center !important;
+      background: rgba(255,255,255,0.04) !important;
+      border: none !important;
+      border-left: 1px solid rgba(240,98,138,0.18) !important;
+      border-right: 1px solid rgba(240,98,138,0.18) !important;
+      border-radius: 0 !important;
+      color: #e8e8ff !important;
+      padding: 4px !important;
+    }
+
+    /* ── Toggle switch (Clock Enabled / Lite Mode) ───────────────────────────── */
+    #moduleProperty .switch,
+    #propertiesPanel .switch {
+      position: relative !important;
+      display: inline-block !important;
+      width: 34px !important;
+      height: 18px !important;
+      flex-shrink: 0 !important;
+      margin: 0 !important;
+    }
+    #moduleProperty .switch input,
+    #propertiesPanel .switch input {
+      opacity: 0 !important;
+      width: 0 !important;
+      height: 0 !important;
+      position: absolute !important;
+    }
+    #moduleProperty .slider,
+    #propertiesPanel .slider {
+      position: absolute !important;
+      inset: 0 !important;
+      background: rgba(255,255,255,0.1) !important;
+      border: 1px solid rgba(240,98,138,0.2) !important;
+      border-radius: 18px !important;
+      cursor: pointer !important;
+      transition: background 0.2s !important;
+    }
+    #moduleProperty .slider::after,
+    #propertiesPanel .slider::after {
+      content: "" !important;
+      position: absolute !important;
+      width: 12px !important;
+      height: 12px !important;
+      left: 2px !important;
+      top: 2px !important;
+      background: #888 !important;
+      border-radius: 50% !important;
+      transition: transform 0.2s, background 0.2s !important;
+    }
+    #moduleProperty .switch input:checked + .slider,
+    #propertiesPanel .switch input:checked + .slider {
+      background: rgba(240,98,138,0.25) !important;
+      border-color: rgba(240,98,138,0.5) !important;
+    }
+    #moduleProperty .switch input:checked + .slider::after,
+    #propertiesPanel .switch input:checked + .slider::after {
+      transform: translateX(16px) !important;
+      background: #f0628a !important;
+    }
+
+    /* ── Action buttons (Edit Layout / Delete Circuit) ───────────────────────── */
+    #moduleProperty button.btn,
+    #propertiesPanel button.btn {
+      flex: 1 !important;
+      padding: 6px 4px !important;
+      font-size: 11px !important;
+      font-weight: 600 !important;
+      letter-spacing: 0.02em !important;
+      border-radius: 6px !important;
+      cursor: pointer !important;
+      transition: background 0.15s, border-color 0.15s !important;
+      white-space: nowrap !important;
+      text-align: center !important;
+    }
+    #moduleProperty button.custom-btn--primary,
+    #propertiesPanel button.custom-btn--primary {
+      background: rgba(240,98,138,0.15) !important;
+      border: 1px solid rgba(240,98,138,0.4) !important;
+      color: #f0628a !important;
+    }
+    #moduleProperty button.custom-btn--primary:hover,
+    #propertiesPanel button.custom-btn--primary:hover {
       background: rgba(240,98,138,0.28) !important;
+    }
+    #moduleProperty button.custom-btn--tertiary,
+    #propertiesPanel button.custom-btn--tertiary {
+      background: rgba(255,80,80,0.1) !important;
+      border: 1px solid rgba(255,80,80,0.3) !important;
+      color: #ff7070 !important;
+    }
+    #moduleProperty button.custom-btn--tertiary:hover,
+    #propertiesPanel button.custom-btn--tertiary:hover {
+      background: rgba(255,80,80,0.22) !important;
     }
 
     /* ── Canvas tab bar ─────────────────────────────────────────────────────── */
