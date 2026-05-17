@@ -340,7 +340,65 @@
     #tabsBar {
       position: absolute;
       left: 0; top: 0; z-index: 4;
+      display: flex;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+      max-width: calc(100% - 60px);
+      scrollbar-width: none;
     }
+    #tabsBar::-webkit-scrollbar { display: none; }
+
+    /* Circuit tabs */
+    #tabsBar .circuits {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      background: rgba(10,10,18,0.88);
+      border: 1px solid rgba(240,98,138,0.25);
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      cursor: pointer;
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      color: #9090c0;
+      white-space: nowrap;
+      user-select: none;
+      transition: background 0.12s;
+    }
+    #tabsBar .circuits.current {
+      background: rgba(240,98,138,0.14);
+      color: #f0628a;
+      border-color: rgba(240,98,138,0.5);
+    }
+    #tabsBar .circuits:hover:not(.current) {
+      background: rgba(240,98,138,0.07);
+      color: #c8c8e8;
+    }
+    #tabsBar .tabsCloseButton {
+      font-size: 10px;
+      color: #6060a0;
+      padding: 0 2px;
+      border-radius: 3px;
+      line-height: 1;
+    }
+    #tabsBar .tabsCloseButton:hover { color: #f0628a; background: rgba(240,98,138,0.2); }
+
+    /* Add-circuit button in tab bar */
+    #tabsBar > button {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 10px;
+      background: rgba(10,10,18,0.7);
+      border: 1px solid rgba(240,98,138,0.2);
+      border-bottom: none;
+      border-radius: 6px 6px 0 0;
+      color: #6060a0;
+      font-size: 14px;
+      cursor: pointer;
+      min-height: unset;
+    }
+    #tabsBar > button:hover { color: #f0628a; background: rgba(240,98,138,0.1); }
 
     /* ── Floating toolbar (right side) ───────────────────────────────────────── */
     #sim-toolbar {
@@ -414,6 +472,35 @@
       margin: 1px 4px;
     }
 
+    /* ── Verilog code window (hidden unless in Verilog mode) ─────────────────── */
+    #code-window {
+      display: none;
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      z-index: 10;
+      background: #0d0d1a;
+    }
+    #code-window .CodeMirror { height: 100%; }
+
+    /* ── Element name tooltip (shown on canvas hover) ───────────────────────── */
+    #elementName {
+      display: none;
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      background: rgba(10,10,18,0.88);
+      color: #c0c0e0;
+      font-family: Arial, sans-serif;
+      font-size: 11px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      border: 1px solid rgba(240,98,138,0.2);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+
     /* ── Hint strip ──────────────────────────────────────────────────────────── */
     #sim-hint {
       position: absolute;
@@ -429,6 +516,66 @@
 
     /* ── Loading spinner (hidden) ────────────────────────────────────────────── */
     .loadingIcon { display: none !important; }
+
+    /* ── Alert messages (shown by showMessage / showError in simulator.js) ───── */
+    #MessageDiv {
+      position: absolute;
+      top: 8px; right: 60px; left: auto;
+      z-index: 300;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-width: 320px;
+    }
+    #MessageDiv .alert {
+      padding: 8px 14px;
+      border-radius: 6px;
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      font-weight: 500;
+      pointer-events: auto;
+    }
+    #MessageDiv .alert-danger {
+      background: rgba(180,30,30,0.9);
+      border: 1px solid rgba(255,80,80,0.5);
+      color: #ffd0d0;
+    }
+    #MessageDiv .alert-success {
+      background: rgba(20,100,40,0.9);
+      border: 1px solid rgba(80,200,100,0.4);
+      color: #c0ffd0;
+    }
+
+    /* ── Help tooltip — shown when .show class is added by simulator ─────────── */
+    #Help { display: none; }
+    #Help.show {
+      display: block !important;
+      position: absolute !important;
+      z-index: 500 !important;
+      background: rgba(13,13,26,0.96) !important;
+      border: 1px solid rgba(240,98,138,0.3) !important;
+      border-radius: 6px !important;
+      padding: 8px 12px !important;
+      color: #d0d0f0 !important;
+      font-size: 11px !important;
+      font-family: Arial, sans-serif !important;
+      max-width: 220px !important;
+      pointer-events: none !important;
+    }
+
+    /* ── Context menu — shown when visibility:visible is set ─────────────────── */
+    #contextMenu { visibility: hidden; }
+
+    /* ── Mini-map ─────────────────────────────────────────────────────────────── */
+    #miniMap {
+      display: none;
+      position: absolute;
+      bottom: 8px; right: 8px;
+      z-index: 50;
+      border: 1px solid rgba(240,98,138,0.25);
+      background: rgba(10,10,18,0.85);
+    }
 
     /* ── Scrollbar for properties panel ─────────────────────────────────────── */
     #moduleProperty::-webkit-scrollbar,
@@ -498,6 +645,10 @@
   <div id="dragQPanel" class="panel-drag"></div>
   <div><button type="button" id="undoButton" title="Undo"></button></div>
   <div><button type="button" id="redoButton" title="Redo"></button></div>
+  <div><button type="button" id="deleteSelected" title="Delete Selected"></button></div>
+  <div><button type="button" id="zoomIn" title="Zoom In"></button></div>
+  <div><button type="button" id="zoomOut" title="Zoom Out"></button></div>
+  <div><button type="button" id="viewButton" title="Full View"></button></div>
   <div class="zoom-slider d-flex align-items-center">
     <button id="decrement" aria-label="Zoom Out">-</button>
     <input type="range" min="0" max="45" step="1" id="customRange1" aria-label="Zoom Level">
@@ -591,11 +742,11 @@
   <div onclick="menuItemClicked(7)" style="padding:6px 14px;cursor:pointer;" onmouseover="this.style.background='rgba(240,98,138,0.15)'" onmouseout="this.style.background=''">Fit to Screen</div>
 </div>
 
-<!-- Tooltip help popup (shown on gate hover in panel) -->
-<div id="Help" style="display:none;position:absolute;z-index:500;background:rgba(13,13,26,0.96);border:1px solid rgba(240,98,138,0.3);border-radius:6px;padding:8px 12px;color:#d0d0f0;font-size:11px;font-family:Arial,sans-serif;max-width:220px;pointer-events:none;"></div>
+<!-- Tooltip help popup (shown when .show class added by simulator on gate hover) -->
+<div id="Help"></div>
 
-<!-- Mini-map (bottom-right canvas overview) -->
-<div id="miniMap" style="display:none;position:absolute;bottom:8px;right:8px;z-index:50;border:1px solid rgba(240,98,138,0.25);background:rgba(10,10,18,0.85);">
+<!-- Mini-map (bottom-right canvas overview — shown by minimap.js) -->
+<div id="miniMap">
   <canvas id="miniMapArea"></canvas>
 </div>
 
