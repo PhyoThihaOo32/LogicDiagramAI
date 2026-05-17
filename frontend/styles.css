@@ -132,9 +132,13 @@ body::after {
 }
 @keyframes e-bolt-strike {
   0%   { opacity: 0; }
-  8%   { opacity: 1; }
-  30%  { opacity: 0.75; }
-  65%  { opacity: 0.25; }
+  5%   { opacity: 1; }
+  22%  { opacity: 0.88; }
+  32%  { opacity: 0.06; }   /* channel collapses */
+  40%  { opacity: 0.72; }   /* 1st return stroke */
+  50%  { opacity: 0.05; }   /* collapses again */
+  57%  { opacity: 0.38; }   /* 2nd return stroke */
+  70%  { opacity: 0; }
   100% { opacity: 0; }
 }
 
@@ -144,57 +148,42 @@ body::after {
   inset: 0;
   pointer-events: none;
   z-index: 0;
-  background: radial-gradient(ellipse 55% 50% at var(--fx, 50%) var(--fy, 40%),
-    rgba(26,111,255,0.12) 0%,
-    rgba(0,229,255,0.07) 30%,
-    rgba(255,45,120,0.04) 55%,
-    transparent 70%);
+  background: radial-gradient(ellipse 65% 60% at var(--fx, 50%) var(--fy, 40%),
+    rgba(255,255,255,0.07) 0%,
+    rgba(26,111,255,0.22) 18%,
+    rgba(0,229,255,0.12) 38%,
+    rgba(255,45,120,0.06) 60%,
+    transparent 76%);
   opacity: 0;
-  animation: e-flash-burst 0.6s ease-out forwards;
+  animation: e-flash-burst 0.85s ease-out forwards;
 }
 @keyframes e-flash-burst {
   0%   { opacity: 0; }
-  8%   { opacity: 1; }
+  6%   { opacity: 1; }
+  22%  { opacity: 0.75; }
+  35%  { opacity: 0.08; }   /* mirrors bolt collapse */
+  43%  { opacity: 0.55; }   /* mirrors 1st return stroke */
+  80%  { opacity: 0; }
   100% { opacity: 0; }
 }
 
-/* Spark particles */
-.e-spark {
+/* Lingering corona — slow-fading ambient bloom after the strike */
+.e-corona {
   position: fixed;
-  width: var(--sz, 3px);
-  height: var(--sz, 3px);
-  border-radius: 50%;
-  background: #fff;
+  inset: 0;
   pointer-events: none;
-  z-index: 1;
-  box-shadow:
-    0 0 4px var(--sc, #00e5ff),
-    0 0 10px var(--sc, #00e5ff),
-    0 0 20px rgba(26,111,255,0.6);
+  z-index: 0;
+  background: radial-gradient(ellipse 50% 45% at var(--fx, 50%) var(--fy, 40%),
+    rgba(26,111,255,0.08) 0%,
+    rgba(0,229,255,0.05) 40%,
+    transparent 70%);
   opacity: 0;
-  animation: e-spark-fly var(--dur, 0.55s) cubic-bezier(0.2, 0.8, 0.1, 1) forwards;
+  animation: e-corona-linger 1.5s ease-out forwards;
 }
-@keyframes e-spark-fly {
-  0%   { opacity: 1;   transform: translate(0, 0) scale(1); }
-  60%  { opacity: 0.7; }
-  100% { opacity: 0;   transform: translate(var(--dx,0px), var(--dy,0px)) scale(0.1); }
-}
-
-/* Trailing ember (slower, drifts further) */
-.e-ember {
-  position: fixed;
-  width: 2px; height: 2px;
-  border-radius: 50%;
-  pointer-events: none;
-  z-index: 1;
-  background: #fff;
-  box-shadow: 0 0 6px var(--sc, #1a6fff), 0 0 14px var(--sc, #1a6fff);
-  opacity: 0;
-  animation: e-ember-drift var(--dur, 1s) ease-out forwards;
-}
-@keyframes e-ember-drift {
-  0%   { opacity: 0.9; transform: translate(0, 0) scale(1); }
-  100% { opacity: 0;   transform: translate(var(--dx,0px), var(--dy,-60px)) scale(0); }
+@keyframes e-corona-linger {
+  0%   { opacity: 0; }
+  8%   { opacity: 1; }
+  100% { opacity: 0; }
 }
 
 /* ── Layout ────────────────────────────────────────────────────────────────── */
