@@ -870,52 +870,79 @@
     // they're also available via our toolbar postMessage route.
   });
 
-  /* ─── Message handler for CUSTOM commands not handled by simulator.js ─────── */
+  /* ─── Message handler for commands that must run in the iframe context ──── */
   window.addEventListener('message', function(e) {
     if (!e.data || !e.data.type) return;
     var type = e.data.type;
 
+    // Auto-fit once a circuit is loaded
     if (type === 'loadCircuit') {
-      // Auto-fit once the circuit is rendered
-      setTimeout(function() { simPost('simFit'); }, 350);
+      setTimeout(function() { simPost('simFit'); }, 400);
       return;
     }
 
+    // Undo / Redo — click the hidden buttons so simulator.js jQuery handlers fire
     if (type === 'simUndo') {
       var undoBtn = document.getElementById('undoButton');
-      if (undoBtn) { undoBtn.click(); return; }
-      // Fallback: dispatch Ctrl+Z keyboard event
-      document.dispatchEvent(new KeyboardEvent('keydown', { key:'z', ctrlKey:true, bubbles:true }));
+      if (undoBtn) undoBtn.click();
       return;
     }
-
     if (type === 'simRedo') {
       var redoBtn = document.getElementById('redoButton');
-      if (redoBtn) { redoBtn.click(); return; }
-      document.dispatchEvent(new KeyboardEvent('keydown', { key:'y', ctrlKey:true, bubbles:true }));
+      if (redoBtn) redoBtn.click();
       return;
     }
 
+    // Delete selected element
+    if (type === 'simDelete') {
+      var delBtn = document.getElementById('deleteSelected');
+      if (delBtn) delBtn.click();
+      return;
+    }
+
+    // Toggle gate panel (slide in/out)
     if (type === 'simTogglePanel') {
-      var panel  = document.getElementById('elementPanel');
-      var sim    = document.getElementById('simulation');
-      var btn    = document.getElementById('sim-panel');
       var closed = document.body.classList.toggle('panel-closed');
+      var btn = document.getElementById('sim-panel');
       if (btn) btn.classList.toggle('tb-active', !closed);
       return;
     }
 
+    // Save — download as .cv file (generateSaveData + download exposed by simulator.js)
     if (type === 'simSave') {
-      var saveEl = document.getElementById('saveOffline');
-      if (saveEl) { saveEl.click(); return; }
-      // Fallback: Ctrl+S
-      document.dispatchEvent(new KeyboardEvent('keydown', { key:'s', ctrlKey:true, bubbles:true }));
+      try {
+        var name = (typeof getProjectName === 'function' ? getProjectName() : null) || 'circuit';
+        var data = generateSaveData(name, false);
+        download('circuit.cv', data);
+      } catch(err) {
+        // Fallback: save to localStorage via the hidden button
+        var saveEl = document.getElementById('saveOffline');
+        if (saveEl) saveEl.click();
+      }
       return;
     }
 
+    // Clear — bypass the internal confirm (parent toolbar already confirmed)
     if (type === 'simClear') {
-      var clearEl = document.getElementById('clearProject');
-      if (clearEl) clearEl.click();
+      try {
+        if (typeof resetScopeList === 'function') {
+          window.globalScope = undefined;
+          resetScopeList();
+          document.querySelectorAll('.circuits').forEach(function(el) { el.remove(); });
+          if (typeof newCircuit === 'function') newCircuit('main');
+          if (typeof showMessage === 'function') showMessage('Canvas cleared!');
+        } else {
+          // Fallback: trigger clearProject — user gets a second confirm
+          var clearEl = document.getElementById('clearProject');
+          if (clearEl) clearEl.click();
+        }
+      } catch(err) { console.warn('simClear error:', err); }
+      return;
+    }
+
+    // New blank circuit tab
+    if (type === 'simNewCircuit') {
+      if (typeof newCircuit === 'function') newCircuit('New Circuit');
       return;
     }
   });

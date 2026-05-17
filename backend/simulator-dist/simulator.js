@@ -51005,19 +51005,26 @@ User Id: ${window.user_id}`;
     const startListeners3 = embed ? startListeners2 : startListeners;
     window.addEventListener("message", (event) => {
       if (!event.data) return;
-      if (event.data.type === "loadCircuit" && event.data.circuitData) {
+      const t = event.data.type;
+      // NOTE: simUndo, simRedo, simTogglePanel, simSave, simClear are handled
+      // by the inline script in index.html to avoid double-firing.
+      if (t === "loadCircuit" && event.data.circuitData) {
         load(event.data.circuitData);
-      } else if (event.data.type === "simZoomIn") {
+      } else if (t === "simZoomIn") {
         ZoomIn();
-      } else if (event.data.type === "simZoomOut") {
+      } else if (t === "simZoomOut") {
         ZoomOut();
-      } else if (event.data.type === "simFit") {
+      } else if (t === "simFit") {
         if (window.globalScope) {
           window.globalScope.centerFocus(false);
           gridUpdateSet(true);
           updateCanvasSet(true);
           scheduleUpdate(1);
         }
+      } else if (t === "simDelete") {
+        deleteSelected();
+      } else if (t === "simNewCircuit") {
+        newCircuit("main");
       }
     });
     setupElementLists();

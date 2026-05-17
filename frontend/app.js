@@ -205,21 +205,23 @@ function renderSimulatorPanel(data) {
   panel.innerHTML = `
     <div class="sim-controls">
       <!-- Panel toggle -->
-      <button type="button" id="simPanelBtn" class="sim-btn-active" title="Show/hide gate palette">&#x229E; Panel</button>
+      <button type="button" id="simPanelBtn" class="sim-btn-active" title="Show/hide gate palette (P)">&#x229E; Panel</button>
       <span class="sim-sep"></span>
       <!-- Edit -->
-      <button type="button" id="simUndoBtn"  title="Undo last action (Ctrl+Z)">&#x21A9; Undo</button>
-      <button type="button" id="simRedoBtn"  title="Redo (Ctrl+Y)">&#x21AA; Redo</button>
+      <button type="button" id="simUndoBtn"   title="Undo (Ctrl+Z)">&#x21A9; Undo</button>
+      <button type="button" id="simRedoBtn"   title="Redo (Ctrl+Y)">&#x21AA; Redo</button>
+      <button type="button" id="simDeleteBtn" title="Delete selected element (Del)">&#x2715; Delete</button>
       <span class="sim-sep"></span>
       <!-- View -->
-      <button type="button" id="simFitBtn"     title="Fit circuit to screen (F)">&#x26F6; Fit</button>
-      <button type="button" id="simZoomInBtn"  title="Zoom in (+)">+ Zoom</button>
-      <button type="button" id="simZoomOutBtn" title="Zoom out (−)">− Zoom</button>
+      <button type="button" id="simFitBtn"      title="Fit circuit to screen (F)">&#x26F6; Fit</button>
+      <button type="button" id="simZoomInBtn"   title="Zoom in (+)">&#x2b; Zoom</button>
+      <button type="button" id="simZoomOutBtn"  title="Zoom out (−)">&#x2212; Zoom</button>
       <span class="sim-sep"></span>
-      <!-- Save / clear -->
-      <button type="button" id="simSaveBtn"  title="Download circuit (.cv)">&#x1F4BE; Save</button>
+      <!-- Save / New / Clear -->
+      <button type="button" id="simSaveBtn"  title="Download circuit as .cv file">&#x1F4BE; Save</button>
+      <button type="button" id="simNewBtn"   title="Add a new blank circuit tab">&#x2795; New</button>
       <button type="button" id="simClearBtn" class="sim-btn-danger" title="Clear canvas and start fresh">&#x1F5D1; Clear</button>
-      <span class="sim-hint-label">Drag gates from panel &nbsp;·&nbsp; Click pins to wire &nbsp;·&nbsp; Scroll to zoom</span>
+      <span class="sim-hint-label">Drag gates from panel &nbsp;·&nbsp; Click pins to wire &nbsp;·&nbsp; Scroll to zoom &nbsp;·&nbsp; Del to remove</span>
     </div>
     <iframe id="cvSimulator" src="about:blank" title="CircuitVerse Simulator" allowfullscreen></iframe>`;
 
@@ -236,13 +238,15 @@ function renderSimulatorPanel(data) {
     simPanelOpen = !simPanelOpen;
     document.querySelector("#simPanelBtn").classList.toggle("sim-btn-active", simPanelOpen);
   });
-  document.querySelector("#simUndoBtn").addEventListener("click",  () => simCmd("simUndo"));
-  document.querySelector("#simRedoBtn").addEventListener("click",  () => simCmd("simRedo"));
-  document.querySelector("#simFitBtn").addEventListener("click",   () => simCmd("simFit"));
-  document.querySelector("#simZoomInBtn").addEventListener("click",() => simCmd("simZoomIn"));
+  document.querySelector("#simUndoBtn").addEventListener("click",   () => simCmd("simUndo"));
+  document.querySelector("#simRedoBtn").addEventListener("click",   () => simCmd("simRedo"));
+  document.querySelector("#simDeleteBtn").addEventListener("click", () => simCmd("simDelete"));
+  document.querySelector("#simFitBtn").addEventListener("click",    () => simCmd("simFit"));
+  document.querySelector("#simZoomInBtn").addEventListener("click", () => simCmd("simZoomIn"));
   document.querySelector("#simZoomOutBtn").addEventListener("click",() => simCmd("simZoomOut"));
-  document.querySelector("#simSaveBtn").addEventListener("click",  () => simCmd("simSave"));
-  document.querySelector("#simClearBtn").addEventListener("click", () => {
+  document.querySelector("#simSaveBtn").addEventListener("click",   () => simCmd("simSave"));
+  document.querySelector("#simNewBtn").addEventListener("click",    () => simCmd("simNewCircuit"));
+  document.querySelector("#simClearBtn").addEventListener("click",  () => {
     if (window.confirm("Clear the simulator canvas and start a fresh circuit?")) {
       simCmd("simClear");
     }
