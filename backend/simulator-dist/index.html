@@ -906,13 +906,6 @@
       return;
     }
 
-    // Delete selected element
-    if (type === 'simDelete') {
-      var delBtn = document.getElementById('deleteSelected');
-      if (delBtn) delBtn.click();
-      return;
-    }
-
     // Toggle gate panel (slide in/out)
     if (type === 'simTogglePanel') {
       var closed = document.body.classList.toggle('panel-closed');
@@ -953,12 +946,7 @@
       return;
     }
 
-    // New blank circuit tab
-    if (type === 'simNewCircuit') {
-      if (typeof newCircuit === 'function') newCircuit('New Circuit');
-      return;
-    }
-  });
+      });
 </script>
 
 </body>
