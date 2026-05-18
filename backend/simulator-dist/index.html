@@ -14,11 +14,48 @@
   <link rel="stylesheet" href="simulator.css" />
 
   <style>
-    /* Canvas colour tokens — read by getCanvasColors() in simulator.js at startup.
-       Setting these here ensures the board is always white in every app theme.    */
+    /* ── CircuitVerse Default Theme tokens ───────────────────────────────────────
+       Every property here is read at render-time via getPropertyValue() in
+       simulator.js.  Seeding them in :root gives a clean white-board look in
+       every app theme without needing the ?theme= URL parameter.              */
     :root {
-      --canvas-fill:   #ffffff;
-      --canvas-stroke: rgba(0, 0, 60, 0.12);
+      /* Canvas background + grid */
+      --canvas-fill:        #ffffff;
+      --canvas-stroke:      rgba(0, 0, 60, 0.12);
+
+      /* Gate bodies */
+      --fill:               white;
+      --stroke:             black;
+
+      /* Wires */
+      --wire-norm:          black;
+      --wire-cnt:           green;
+      --wire-pow:           lightgreen;
+      --wire-sel:           blue;
+      --wire-lose:          red;
+      --wire-draw:          black;
+
+      /* Nodes / pins */
+      --node:               green;
+      --node-norm:          green;
+
+      /* Text & labels */
+      --text:               black;
+      --input-text:         green;
+
+      /* Misc element colours */
+      --secondary-stroke:   red;
+      --splitter:           black;
+      --output-rect:        blue;
+      --hover-and-sel:      rgba(255, 255, 32, 0.8);
+
+      /* Mini-map */
+      --mini-map:           green;
+      --mini-map-stroke:    darkgreen;
+
+      /* Disabled / touch */
+      --disable:            #6c8b93;
+      --touch-menu:         #7d7d7d;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
