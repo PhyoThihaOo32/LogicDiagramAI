@@ -549,6 +549,33 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
+// ── Theme toggle ──────────────────────────────────────────────────────────────
+(function themeInit() {
+  const root = document.documentElement;
+  const btn  = document.getElementById("themeToggle");
+  const icon = btn ? btn.querySelector(".theme-icon") : null;
+
+  function applyTheme(theme) {
+    root.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+    if (icon) icon.textContent = theme === "dark" ? "☀️" : "🌙";
+  }
+
+  // Load saved preference; default to light
+  applyTheme(localStorage.getItem("theme") || "light");
+
+  if (btn) {
+    btn.addEventListener("click", () => {
+      const next = root.getAttribute("data-theme") === "dark" ? "light" : "dark";
+      // Spin animation
+      btn.style.transition = "transform 0.38s cubic-bezier(0.2,0.8,0.3,1), box-shadow 0.25s, background 0.4s, border-color 0.4s";
+      btn.style.transform  = "rotate(360deg) scale(1.2)";
+      setTimeout(() => { btn.style.transform = ""; }, 380);
+      applyTheme(next);
+    });
+  }
+})();
+
 // ── Electric arc / lightning bolt effects ─────────────────────────────────────
 // Randomly spawns neon lightning bolts with multi-return-stroke flicker,
 // branching channels, dual-layer glow, and a lingering corona bloom.
@@ -560,13 +587,23 @@ function escapeHtml(value) {
   function rndInt(a, b) { return Math.floor(rnd(a, b + 1)); }
   function pick(...arr) { return arr[Math.floor(Math.random() * arr.length)]; }
 
-  // Colour palette: divine gold (weighted 2×) · white-electric · olympian violet
-  const PALETTES = [
+  // Palettes switch with the active theme
+  const LIGHT_PALETTES = [
     { color: "#ffd60a", aura: "rgba(255,214,10,0.55)",  halo: "rgba(255,200,0,0.32)"   }, // zeus gold
     { color: "#ffd60a", aura: "rgba(255,214,10,0.55)",  halo: "rgba(255,200,0,0.32)"   }, // zeus gold ×2
     { color: "#ffffff", aura: "rgba(255,255,255,0.55)",  halo: "rgba(200,220,255,0.3)"  }, // divine white
     { color: "#a855f7", aura: "rgba(168,85,247,0.48)",  halo: "rgba(168,85,247,0.26)"  }, // olympian violet
   ];
+  const DARK_PALETTES = [
+    { color: "#1a6fff", aura: "rgba(26,111,255,0.5)",   halo: "rgba(26,111,255,0.28)"  }, // electric blue
+    { color: "#1a6fff", aura: "rgba(26,111,255,0.5)",   halo: "rgba(26,111,255,0.28)"  }, // electric blue ×2
+    { color: "#00e5ff", aura: "rgba(0,229,255,0.45)",   halo: "rgba(0,229,255,0.25)"   }, // electric cyan
+    { color: "#ff2d78", aura: "rgba(255,45,120,0.45)",  halo: "rgba(255,45,120,0.22)"  }, // neon pink
+  ];
+  function activePalettes() {
+    return document.documentElement.getAttribute("data-theme") === "dark"
+      ? DARK_PALETTES : LIGHT_PALETTES;
+  }
 
   /**
    * Build jagged polyline points for a lightning channel.
@@ -660,7 +697,7 @@ function escapeHtml(value) {
 
   /** Spawn one lightning bolt (main channel + optional branches) */
   function spawnBolt() {
-    const pal      = pick(...PALETTES);
+    const pal      = pick(...activePalettes());
     const length   = rnd(100, 320);
     const segments = rndInt(6, 13);
     const angle    = rnd(-65, 65);
