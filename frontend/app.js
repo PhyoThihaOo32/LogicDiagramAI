@@ -148,6 +148,7 @@ function loadSimulator(data) {
   const send = () => {
     if (!iframe.contentWindow) return;
     iframe.contentWindow.postMessage({ type: "loadCircuit", circuitData: data.simulatorCircuit }, "*");
+    sendThemeToSimulator();
   };
 
   const sendWithRetries = () => {
@@ -550,6 +551,16 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
+// ── Simulator iframe theme relay ─────────────────────────────────────────────
+/** Send the current theme to the simulator iframe so it can match. */
+function sendThemeToSimulator() {
+  const theme = document.documentElement.getAttribute("data-theme") || "light";
+  const iframe = document.querySelector("#cvSimulator");
+  if (iframe && iframe.contentWindow) {
+    iframe.contentWindow.postMessage({ type: "setTheme", theme }, "*");
+  }
+}
+
 // ── SVG diagram theme recoloring ──────────────────────────────────────────────
 // Remaps the server-generated SVG (dark neon palette) to a light Zeus palette
 // when the light theme is active, and restores originals for dark mode.
@@ -682,6 +693,8 @@ function recolorAllDiagrams() {
     if (icon) icon.textContent = theme === "dark" ? "☀️" : "🌙";
     // Recolor any diagrams already on screen
     recolorAllDiagrams();
+    // Push theme into the simulator iframe so it matches
+    sendThemeToSimulator();
   }
 
   // Load saved preference; default to light

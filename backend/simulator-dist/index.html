@@ -771,6 +771,266 @@
     #propertiesPanel::-webkit-scrollbar-thumb {
       background: rgba(240,98,138,0.3); border-radius: 2px;
     }
+
+    /* ══ LIGHT / ZEUS THEME ═══════════════════════════════════════════════════
+       Applied when the parent app sends { type:"setTheme", theme:"light" }
+       which sets data-theme="light" on <html>.
+    ═══════════════════════════════════════════════════════════════════════════ */
+    html[data-theme="light"],
+    html[data-theme="light"] body {
+      background: #eef3ff !important;
+      color-scheme: light;
+    }
+    html[data-theme="light"] #simulation { background: #eef3ff; }
+
+    /* ── Left panel ── */
+    html[data-theme="light"] #elementPanel {
+      background: rgba(255,255,255,0.97) !important;
+      border-right: 1px solid rgba(184,121,0,0.18) !important;
+    }
+    html[data-theme="light"] #elementPanel::before {
+      color: #b87900 !important;
+      background: rgba(248,250,255,0.99) !important;
+      border-bottom: 1px solid rgba(184,121,0,0.15) !important;
+    }
+    html[data-theme="light"] #elementSearch,
+    html[data-theme="light"] #elementPanel .search-input {
+      background: #ffffff !important;
+      color: #0d0d2b !important;
+      border: 1px solid rgba(184,121,0,0.3) !important;
+    }
+    html[data-theme="light"] #elementSearch:focus,
+    html[data-theme="light"] #elementPanel .search-input:focus {
+      border-color: #b87900 !important;
+      box-shadow: 0 0 0 2px rgba(184,121,0,0.15) !important;
+    }
+    html[data-theme="light"] #elementPanel .search-close { color: #94a3b8 !important; }
+    html[data-theme="light"] #elementPanel .search-close:hover { color: #b87900 !important; }
+    html[data-theme="light"] #elementPanel .search-results {
+      background: rgba(255,255,255,0.97) !important;
+    }
+    html[data-theme="light"] #menu::-webkit-scrollbar-thumb {
+      background: rgba(184,121,0,0.3) !important;
+    }
+
+    /* Accordion headers */
+    html[data-theme="light"] #elementPanel .panelHeader,
+    html[data-theme="light"] #elementPanel .ui-accordion-header,
+    html[data-theme="light"] #elementPanel .elementHeading,
+    html[data-theme="light"] #elementPanel .panelHeading,
+    html[data-theme="light"] #elementPanel h3,
+    html[data-theme="light"] #elementPanel .circuit-group-title {
+      background: rgba(248,250,255,0.97) !important;
+      color: #b87900 !important;
+      border-bottom: 1px solid rgba(184,121,0,0.18) !important;
+    }
+    html[data-theme="light"] #elementPanel .panelHeader:hover,
+    html[data-theme="light"] #elementPanel .ui-accordion-header:hover {
+      background: rgba(255,240,200,0.5) !important;
+      color: #e8a800 !important;
+    }
+    html[data-theme="light"] #elementPanel .panel,
+    html[data-theme="light"] #elementPanel .ui-accordion-content {
+      background: rgba(255,255,255,0.6) !important;
+    }
+
+    /* Gate icons */
+    html[data-theme="light"] #elementPanel .icon.logixModules:hover,
+    html[data-theme="light"] #elementPanel .filterElements:hover {
+      background: rgba(184,121,0,0.1) !important;
+      border-color: rgba(184,121,0,0.28) !important;
+    }
+    html[data-theme="light"] #elementPanel .icon.logixModules[title]::after { color: #64748b !important; }
+    html[data-theme="light"] #elementPanel .icon img,
+    html[data-theme="light"] #elementPanel img { filter: opacity(0.82) !important; }
+    html[data-theme="light"] #elementPanel svg path,
+    html[data-theme="light"] #elementPanel svg rect { fill: #334155 !important; }
+
+    /* Panel items */
+    html[data-theme="light"] #elementPanel .module,
+    html[data-theme="light"] #elementPanel .sub-module,
+    html[data-theme="light"] #elementPanel .panelItem,
+    html[data-theme="light"] #elementPanel li,
+    html[data-theme="light"] #elementPanel .element,
+    html[data-theme="light"] #elementPanel .circuit-group-item {
+      color: #1e293b !important;
+      border-color: rgba(0,0,0,0.06) !important;
+    }
+    html[data-theme="light"] #elementPanel .module:hover,
+    html[data-theme="light"] #elementPanel .sub-module:hover,
+    html[data-theme="light"] #elementPanel .panelItem:hover,
+    html[data-theme="light"] #elementPanel li:hover,
+    html[data-theme="light"] #elementPanel .element:hover {
+      background: rgba(184,121,0,0.1) !important;
+      color: #b87900 !important;
+    }
+    html[data-theme="light"] #elementPanel .elementSubList > li > span,
+    html[data-theme="light"] #elementPanel .sub-heading { color: #64748b !important; }
+
+    /* ── Properties panel ── */
+    html[data-theme="light"] #moduleProperty,
+    html[data-theme="light"] #propertiesPanel {
+      background: rgba(255,255,255,0.97) !important;
+      border: 1px solid rgba(184,121,0,0.28) !important;
+      color: #0d0d2b !important;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.1), 0 0 0 1px rgba(255,255,255,0.6) !important;
+    }
+    html[data-theme="light"] #moduleProperty::before,
+    html[data-theme="light"] #propertiesPanel::before {
+      color: #b87900 !important;
+      background: rgba(184,121,0,0.06) !important;
+      border-bottom: 1px solid rgba(184,121,0,0.14) !important;
+    }
+    html[data-theme="light"] #moduleProperty *,
+    html[data-theme="light"] #propertiesPanel * {
+      color: #1e293b !important;
+      border-color: rgba(184,121,0,0.15) !important;
+    }
+    html[data-theme="light"] #moduleProperty .moduleProperty-header,
+    html[data-theme="light"] #propertiesPanel .moduleProperty-header {
+      color: #64748b !important;
+      border-bottom: 1px solid rgba(184,121,0,0.14) !important;
+    }
+    html[data-theme="light"] #moduleProperty p > span,
+    html[data-theme="light"] #propertiesPanel p > span { color: #64748b !important; }
+    html[data-theme="light"] #moduleProperty input[type="text"],
+    html[data-theme="light"] #moduleProperty input[type="number"],
+    html[data-theme="light"] #moduleProperty select,
+    html[data-theme="light"] #propertiesPanel input[type="text"],
+    html[data-theme="light"] #propertiesPanel input[type="number"],
+    html[data-theme="light"] #propertiesPanel select {
+      background: rgba(255,255,255,0.9) !important;
+      color: #0d0d2b !important;
+      border: 1px solid rgba(184,121,0,0.28) !important;
+    }
+    html[data-theme="light"] #moduleProperty input:focus,
+    html[data-theme="light"] #moduleProperty select:focus,
+    html[data-theme="light"] #propertiesPanel input:focus,
+    html[data-theme="light"] #propertiesPanel select:focus {
+      border-color: rgba(184,121,0,0.7) !important;
+      background: rgba(184,121,0,0.04) !important;
+    }
+    html[data-theme="light"] #moduleProperty .input-group,
+    html[data-theme="light"] #propertiesPanel .input-group {
+      border: 1px solid rgba(184,121,0,0.25) !important;
+    }
+    html[data-theme="light"] #moduleProperty .input-group .btn-minus,
+    html[data-theme="light"] #moduleProperty .input-group .btn-plus,
+    html[data-theme="light"] #propertiesPanel .input-group .btn-minus,
+    html[data-theme="light"] #propertiesPanel .input-group .btn-plus {
+      background: rgba(184,121,0,0.1) !important;
+      color: #b87900 !important;
+    }
+    html[data-theme="light"] #moduleProperty .input-group .btn-minus:hover,
+    html[data-theme="light"] #moduleProperty .input-group .btn-plus:hover,
+    html[data-theme="light"] #propertiesPanel .input-group .btn-minus:hover,
+    html[data-theme="light"] #propertiesPanel .input-group .btn-plus:hover {
+      background: rgba(184,121,0,0.22) !important;
+    }
+    html[data-theme="light"] #moduleProperty .input-group .form-control-text-input,
+    html[data-theme="light"] #propertiesPanel .input-group .form-control-text-input {
+      background: rgba(255,255,255,0.9) !important;
+      border-left: 1px solid rgba(184,121,0,0.18) !important;
+      border-right: 1px solid rgba(184,121,0,0.18) !important;
+      color: #0d0d2b !important;
+    }
+    /* Toggle switches */
+    html[data-theme="light"] #moduleProperty .slider,
+    html[data-theme="light"] #propertiesPanel .slider {
+      background: rgba(0,0,0,0.07) !important;
+      border: 1px solid rgba(184,121,0,0.22) !important;
+    }
+    html[data-theme="light"] #moduleProperty .slider::after,
+    html[data-theme="light"] #propertiesPanel .slider::after { background: #aaa !important; }
+    html[data-theme="light"] #moduleProperty .switch input:checked + .slider,
+    html[data-theme="light"] #propertiesPanel .switch input:checked + .slider {
+      background: rgba(184,121,0,0.22) !important;
+      border-color: rgba(184,121,0,0.5) !important;
+    }
+    html[data-theme="light"] #moduleProperty .switch input:checked + .slider::after,
+    html[data-theme="light"] #propertiesPanel .switch input:checked + .slider::after {
+      background: #b87900 !important;
+    }
+    /* Action buttons */
+    html[data-theme="light"] #moduleProperty button.custom-btn--primary,
+    html[data-theme="light"] #propertiesPanel button.custom-btn--primary {
+      background: rgba(184,121,0,0.1) !important;
+      border: 1px solid rgba(184,121,0,0.4) !important;
+      color: #b87900 !important;
+    }
+    html[data-theme="light"] #moduleProperty button.custom-btn--primary:hover,
+    html[data-theme="light"] #propertiesPanel button.custom-btn--primary:hover {
+      background: rgba(184,121,0,0.22) !important;
+    }
+    html[data-theme="light"] #moduleProperty button.custom-btn--tertiary,
+    html[data-theme="light"] #propertiesPanel button.custom-btn--tertiary {
+      background: rgba(220,38,38,0.07) !important;
+      border: 1px solid rgba(220,38,38,0.28) !important;
+      color: #dc2626 !important;
+    }
+    html[data-theme="light"] #moduleProperty button.custom-btn--tertiary:hover,
+    html[data-theme="light"] #propertiesPanel button.custom-btn--tertiary:hover {
+      background: rgba(220,38,38,0.15) !important;
+    }
+    html[data-theme="light"] #moduleProperty::-webkit-scrollbar-thumb,
+    html[data-theme="light"] #propertiesPanel::-webkit-scrollbar-thumb {
+      background: rgba(184,121,0,0.28) !important;
+    }
+
+    /* ── Canvas tab bar ── */
+    html[data-theme="light"] #tabsBar .circuits {
+      background: rgba(248,250,255,0.95) !important;
+      border: 1px solid rgba(184,121,0,0.22) !important;
+      border-bottom: none !important;
+      color: #5a5f8a !important;
+    }
+    html[data-theme="light"] #tabsBar .circuits.current {
+      background: rgba(184,121,0,0.1) !important;
+      color: #b87900 !important;
+      border-color: rgba(184,121,0,0.45) !important;
+    }
+    html[data-theme="light"] #tabsBar .circuits:hover:not(.current) {
+      background: rgba(255,240,200,0.5) !important;
+      color: #2a2d5a !important;
+    }
+    html[data-theme="light"] #tabsBar .tabsCloseButton { color: #94a3b8 !important; }
+    html[data-theme="light"] #tabsBar .tabsCloseButton:hover {
+      color: #b87900 !important;
+      background: rgba(184,121,0,0.15) !important;
+    }
+    html[data-theme="light"] #tabsBar > button {
+      background: rgba(248,250,255,0.85) !important;
+      border: 1px solid rgba(184,121,0,0.2) !important;
+      border-bottom: none !important;
+      color: #5a5f8a !important;
+    }
+    html[data-theme="light"] #tabsBar > button:hover {
+      color: #b87900 !important;
+      background: rgba(184,121,0,0.1) !important;
+    }
+
+    /* ── Misc UI ── */
+    html[data-theme="light"] #elementName {
+      background: rgba(255,255,255,0.97) !important;
+      color: #1e293b !important;
+      border: 1px solid rgba(184,121,0,0.2) !important;
+    }
+    html[data-theme="light"] #contextMenu {
+      background: rgba(255,255,255,0.98) !important;
+      border: 1px solid rgba(184,121,0,0.32) !important;
+      color: #0d0d2b !important;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1) !important;
+    }
+    html[data-theme="light"] #Help.show {
+      background: rgba(255,255,255,0.97) !important;
+      border: 1px solid rgba(184,121,0,0.28) !important;
+      color: #1e293b !important;
+    }
+    html[data-theme="light"] #miniMap {
+      border: 1px solid rgba(184,121,0,0.25) !important;
+      background: rgba(255,255,255,0.85) !important;
+    }
+    html[data-theme="light"] #sim-hint { color: rgba(90,95,138,0.7) !important; }
   </style>
 </head>
 <body>
@@ -1105,6 +1365,12 @@
   window.addEventListener('message', function(e) {
     if (!e.data || !e.data.type) return;
     var type = e.data.type;
+
+    // Apply parent page theme so the simulator matches
+    if (type === 'setTheme') {
+      document.documentElement.setAttribute('data-theme', e.data.theme || 'dark');
+      return;
+    }
 
     // Auto-fit once a circuit is loaded
     if (type === 'loadCircuit') {
