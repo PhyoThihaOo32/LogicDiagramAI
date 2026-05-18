@@ -188,6 +188,48 @@ const NAMED_CIRCUITS = [
     }
   },
   {
+    // Must precede NAND/NOR/XNOR entries so "AND gate" / "OR gate" / "XOR gate"
+    // / "NOT gate" are resolved here without falling through to the AI.
+    pattern: /\band\s+gate\b|\band-gate\b|2.?input.*\band\b(?!.*(?:nand|nor|xnor))/i,
+    result: {
+      type: "combinational", subtype: "and-gate",
+      inputs: ["A", "B"], outputs: ["F"],
+      expressions: { F: "A AND B" },
+      flipFlops: [], stateVariables: [],
+      explanation: "2-input AND gate: output is 1 only when both inputs are 1."
+    }
+  },
+  {
+    pattern: /\bor\s+gate\b|\bor-gate\b|2.?input.*\bor\b(?!.*(?:nand|nor|xnor))/i,
+    result: {
+      type: "combinational", subtype: "or-gate",
+      inputs: ["A", "B"], outputs: ["F"],
+      expressions: { F: "A OR B" },
+      flipFlops: [], stateVariables: [],
+      explanation: "2-input OR gate: output is 1 when at least one input is 1."
+    }
+  },
+  {
+    pattern: /\bxor\s+gate\b|\bxor-gate\b|exclusive.?or/i,
+    result: {
+      type: "combinational", subtype: "xor-gate",
+      inputs: ["A", "B"], outputs: ["F"],
+      expressions: { F: "A XOR B" },
+      flipFlops: [], stateVariables: [],
+      explanation: "2-input XOR gate: output is 1 when inputs differ."
+    }
+  },
+  {
+    pattern: /\bnot\s+gate\b|\bnot-gate\b|\binverter\b/i,
+    result: {
+      type: "combinational", subtype: "not-gate",
+      inputs: ["A"], outputs: ["F"],
+      expressions: { F: "NOT A" },
+      flipFlops: [], stateVariables: [],
+      explanation: "NOT gate (inverter): output is the complement of the input."
+    }
+  },
+  {
     pattern: /\bnand\b/i,
     result: {
       type: "combinational", subtype: "nand",
