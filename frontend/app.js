@@ -160,7 +160,7 @@ function loadSimulator(data) {
     });
   };
 
-  const simulatorUrl = `${API_BASE || window.location.origin}/simulator/?theme=default`;
+  const simulatorUrl = `${API_BASE || window.location.origin}/simulator/`;
   if (iframe.src !== simulatorUrl) {
     state.simulatorFrameLoaded = false;
     iframe.src = simulatorUrl;
